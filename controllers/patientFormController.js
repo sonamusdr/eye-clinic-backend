@@ -47,6 +47,7 @@ exports.getFormByToken = async (req, res) => {
       include: [
         {
           model: Appointment,
+          as: 'Appointment',
           required: false,
           include: [
             {
@@ -57,6 +58,7 @@ exports.getFormByToken = async (req, res) => {
         },
         {
           model: Patient,
+          as: 'Patient',
           required: false,
           attributes: ['id', 'firstName', 'lastName', 'email', 'phone']
         }
@@ -112,11 +114,18 @@ exports.submitForm = async (req, res) => {
       include: [
         {
           model: Appointment,
+          as: 'Appointment',
+          required: false,
           include: [
             {
               model: Patient
             }
           ]
+        },
+        {
+          model: Patient,
+          as: 'Patient',
+          required: false
         }
       ]
     });
