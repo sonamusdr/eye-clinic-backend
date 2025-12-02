@@ -60,85 +60,91 @@ sequelize.authenticate()
         const models = require('./models');
         await sequelize.sync({ force: false, alter: true });
         console.log('Database migrations completed successfully.');
-        
-        // CRITICAL: Always ensure default users exist and are active
-        // This runs on EVERY server startup to prevent lockouts
-        console.log('Ensuring critical system users are active...');
-        const { User } = require('./models');
-        const bcrypt = require('bcryptjs');
-        
-        // Critical system users that MUST always be active
-        const criticalUsers = [
-          {
-            email: 'admin@clinic.com',
-            firstName: 'Admin',
-            lastName: 'User',
-            password: 'admin123',
-            role: 'admin',
-            phone: '1234567890'
-          },
-          {
-            email: 'doctor@clinic.com',
-            firstName: 'John',
-            lastName: 'Doctor',
-            password: 'doctor123',
-            role: 'doctor',
-            specialization: 'Ophthalmology',
-            licenseNumber: 'DOC12345',
-            phone: '1234567891'
-          },
-          {
-            email: 'receptionist@clinic.com',
-            firstName: 'Jane',
-            lastName: 'Receptionist',
-            password: 'receptionist123',
-            role: 'receptionist',
-            phone: '1234567892'
-          }
-        ];
-        
-        // Use upsert to ensure users exist and are always active
-        for (const userData of criticalUsers) {
-          try {
-            const existingUser = await User.findOne({ where: { email: userData.email } });
-            
-            if (existingUser) {
-              // Force activation and password reset (in case it was changed)
-              const hashedPassword = await bcrypt.hash(userData.password, 10);
-              await existingUser.update({
-                password: hashedPassword,
-                isActive: true,
-                firstName: userData.firstName,
-                lastName: userData.lastName,
-                role: userData.role,
-                phone: userData.phone,
-                ...(userData.specialization && { specialization: userData.specialization }),
-                ...(userData.licenseNumber && { licenseNumber: userData.licenseNumber })
-              }, { 
-                individualHooks: false // Skip hooks to avoid validation errors
-              });
-              console.log(`✓ Critical user activated: ${userData.email}`);
-            } else {
-              // Create new user
-              const hashedPassword = await bcrypt.hash(userData.password, 10);
-              await User.create({
-                ...userData,
-                password: hashedPassword,
-                isActive: true
-              });
-              console.log(`✓ Critical user created: ${userData.email}`);
-            }
-          } catch (error) {
-            console.error(`ERROR: Failed to ensure user ${userData.email} is active:`, error.message);
-            // Don't throw - continue with other users
-          }
-        }
-        
-        console.log('✓ Critical system users check completed.');
       } catch (migrationError) {
         console.error('Migration error:', migrationError);
         // Don't exit - server can still run even if migrations fail
       }
+    }
+    
+    // CRITICAL: Always ensure default users exist and are active
+    // This runs on EVERY server startup to prevent lockouts - NO CONDITIONS
+    console.log('Ensuring critical system users are active...');
+    try {
+      const { User } = require('./models');
+      const bcrypt = require('bcryptjs');
+      
+      // Critical system users that MUST always be active
+      const criticalUsers = [
+        {
+          email: 'admin@clinic.com',
+          firstName: 'Admin',
+          lastName: 'User',
+          password: 'admin123',
+          role: 'admin',
+          phone: '1234567890'
+        },
+        {
+          email: 'doctor@clinic.com',
+          firstName: 'John',
+          lastName: 'Doctor',
+          password: 'doctor123',
+          role: 'doctor',
+          specialization: 'Ophthalmology',
+          licenseNumber: 'DOC12345',
+          phone: '1234567891'
+        },
+        {
+          email: 'receptionist@clinic.com',
+          firstName: 'Jane',
+          lastName: 'Receptionist',
+          password: 'receptionist123',
+          role: 'receptionist',
+          phone: '1234567892'
+        }
+      ];
+      
+      // Use upsert to ensure users exist and are always active
+      for (const userData of criticalUsers) {
+        try {
+          const existingUser = await User.findOne({ where: { email: userData.email } });
+          
+          if (existingUser) {
+            // Force activation and password reset (in case it was changed)
+            const hashedPassword = await bcrypt.hash(userData.password, 10);
+            await existingUser.update({
+              password: hashedPassword,
+              isActive: true,
+              firstName: userData.firstName,
+              lastName: userData.lastName,
+              role: userData.role,
+              phone: userData.phone,
+              ...(userData.specialization && { specialization: userData.specialization }),
+              ...(userData.licenseNumber && { licenseNumber: userData.licenseNumber })
+            }, { 
+              individualHooks: false // Skip hooks to avoid validation errors
+            });
+            console.log(`✓ Critical user activated: ${userData.email}`);
+          } else {
+            // Create new user
+            const hashedPassword = await bcrypt.hash(userData.password, 10);
+            await User.create({
+              ...userData,
+              password: hashedPassword,
+              isActive: true
+            });
+            console.log(`✓ Critical user created: ${userData.email}`);
+          }
+        } catch (error) {
+          console.error(`ERROR: Failed to ensure user ${userData.email} is active:`, error.message);
+          console.error('Full error:', error);
+          // Don't throw - continue with other users
+        }
+      }
+      
+      console.log('✓ Critical system users check completed.');
+    } catch (error) {
+      console.error('CRITICAL ERROR: Failed to ensure critical users:', error);
+      // Don't exit - but log the error
     }
     
     app.listen(PORT, () => {
