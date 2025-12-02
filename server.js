@@ -80,13 +80,12 @@ sequelize.authenticate()
             }
           });
           
-          // Force update password and ensure user is active
+          // Force update password and ensure user is active using update() with hooks
           if (!adminCreated) {
-            // Use set and mark as changed to trigger beforeUpdate hook
-            adminUser.set('password', 'admin123');
-            adminUser.changed('password', true);
-            adminUser.isActive = true;
-            await adminUser.save();
+            await adminUser.update({
+              password: 'admin123', // Will be hashed by beforeUpdate hook
+              isActive: true
+            }, { individualHooks: true });
             console.log('Admin user updated: admin@clinic.com / admin123');
           } else {
             console.log('Admin user created: admin@clinic.com / admin123');
@@ -109,10 +108,10 @@ sequelize.authenticate()
           });
           
           if (!doctorCreated) {
-            doctorUser.set('password', 'doctor123');
-            doctorUser.changed('password', true);
-            doctorUser.isActive = true;
-            await doctorUser.save();
+            await doctorUser.update({
+              password: 'doctor123', // Will be hashed by beforeUpdate hook
+              isActive: true
+            }, { individualHooks: true });
             console.log('Doctor user updated: doctor@clinic.com / doctor123');
           } else {
             console.log('Doctor user created: doctor@clinic.com / doctor123');
@@ -133,10 +132,10 @@ sequelize.authenticate()
           });
           
           if (!receptionistCreated) {
-            receptionistUser.set('password', 'receptionist123');
-            receptionistUser.changed('password', true);
-            receptionistUser.isActive = true;
-            await receptionistUser.save();
+            await receptionistUser.update({
+              password: 'receptionist123', // Will be hashed by beforeUpdate hook
+              isActive: true
+            }, { individualHooks: true });
             console.log('Receptionist user updated: receptionist@clinic.com / receptionist123');
           } else {
             console.log('Receptionist user created: receptionist@clinic.com / receptionist123');
