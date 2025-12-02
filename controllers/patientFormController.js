@@ -256,18 +256,11 @@ exports.generateRegistrationFormLink = async (req, res) => {
 
     if (!form) {
       // Create new registration form
-      // Ensure formType is set and handle case where column might not exist yet
       const formData = {
         patientId: actualPatientId,
-        appointmentId: null
+        appointmentId: null,
+        formType: 'registration'
       };
-      
-      // Try to set formType, but handle case where column doesn't exist
-      try {
-        formData.formType = 'registration';
-      } catch (e) {
-        // If formType column doesn't exist, it will be null which is fine
-      }
       
       form = await PatientForm.create(formData);
     }

@@ -59,6 +59,11 @@ const PatientForm = sequelize.define('PatientForm', {
       if (!form.token) {
         form.token = crypto.randomBytes(32).toString('hex');
       }
+      // Set formType if not provided (default to appointment for backward compatibility)
+      if (!form.formType) {
+        // If no appointmentId, it's a registration form
+        form.formType = form.appointmentId ? 'appointment' : 'registration';
+      }
       // Form expires 30 days from creation
       if (!form.expiresAt) {
         const expiresDate = new Date();
