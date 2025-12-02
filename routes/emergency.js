@@ -186,5 +186,50 @@ router.get('/check-user/:email', async (req, res) => {
   }
 });
 
+// EMERGENCY ENDPOINT: Add formType column if it doesn't exist
+router.post('/migrate-formtype', async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    
+    // Check if column exists
+    const [results] = await sequelize.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'patient_forms' AND column_name = 'formType'
+    `);
+    
+    if (results.length === 0) {
+      // Column doesn't exist, add it
+      await sequelize.query(`
+        ALTER TABLE patient_forms 
+        ADD COLUMN formType VARCHAR(20)
+      `);
+      
+      // Set default values for existing rows
+      await sequelize.query(`
+        UPDATE patient_forms 
+        SET formType = 'appointment' 
+        WHERE formType IS NULL
+      `);
+      
+      res.json({
+        success: true,
+        message: 'formType column added successfully'
+      });
+    } else {
+      res.json({
+        success: true,
+        message: 'formType column already exists'
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to migrate formType column',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
 
