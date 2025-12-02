@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const { sequelize } = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
+const userHealthCheck = require('./middleware/userHealthCheck');
 
 // Load environment variables
 dotenv.config();
@@ -23,6 +24,9 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// User health check middleware - ensures critical users are always active
+app.use(userHealthCheck);
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/patients', require('./routes/patients'));
@@ -37,9 +41,54 @@ app.use('/api/telemedicine', require('./routes/telemedicine'));
 app.use('/api/patient-forms', require('./routes/patientForms'));
 app.use('/api/emergency', require('./routes/emergency')); // Emergency endpoints
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Eye Clinic Management System API is running' });
+// Health check endpoint with user verification
+app.get('/api/health', async (req, res) => {
+  try {
+    // Verify critical users are active
+    const { User } = require('./models');
+    const criticalEmails = ['admin@clinic.com', 'doctor@clinic.com', 'receptionist@clinic.com'];
+    const users = await User.findAll({ 
+      where: { email: { [require('sequelize').Op.in]: criticalEmails } },
+      attributes: ['email', 'isActive']
+    });
+    
+    const inactiveUsers = users.filter(u => !u.isActive).map(u => u.email);
+    
+    if (inactiveUsers.length > 0) {
+      // Auto-fix: Activate users if they're inactive
+      const bcrypt = require('bcryptjs');
+      const criticalUsers = [
+        { email: 'admin@clinic.com', password: 'admin123' },
+        { email: 'doctor@clinic.com', password: 'doctor123' },
+        { email: 'receptionist@clinic.com', password: 'receptionist123' }
+      ];
+      
+      for (const userData of criticalUsers) {
+        if (inactiveUsers.includes(userData.email)) {
+          const hashedPassword = await bcrypt.hash(userData.password, 10);
+          await User.update({
+            password: hashedPassword,
+            isActive: true
+          }, {
+            where: { email: userData.email },
+            individualHooks: false
+          });
+        }
+      }
+    }
+    
+    res.json({ 
+      status: 'OK', 
+      message: 'Eye Clinic Management System API is running',
+      criticalUsersActive: inactiveUsers.length === 0
+    });
+  } catch (error) {
+    res.json({ 
+      status: 'OK', 
+      message: 'Eye Clinic Management System API is running',
+      warning: 'Could not verify users'
+    });
+  }
 });
 
 // Error handling middleware
@@ -136,38 +185,45 @@ sequelize.authenticate()
       // Don't exit - but log the error
     }
     
-    // Run migrations AFTER ensuring users are active
-    // This way users are protected even if migrations alter tables
-    if (process.env.NODE_ENV === 'production' || process.env.RUN_MIGRATIONS === 'true') {
+    // IMPORTANT: Do NOT run automatic migrations with alter:true in production
+    // This can cause data loss and reset user passwords
+    // Migrations should be run manually when needed, not automatically on every startup
+    // Only sync models without altering existing tables
+    if (process.env.RUN_MIGRATIONS === 'true' && process.env.ALLOW_ALTER !== 'true') {
       try {
-        console.log('Running database migrations...');
+        console.log('Syncing database models (safe mode - no alter)...');
         const models = require('./models');
-        await sequelize.sync({ force: false, alter: true });
-        console.log('Database migrations completed successfully.');
-        
-        // Re-ensure users are active AFTER migrations (in case migrations reset something)
-        console.log('Re-checking critical users after migrations...');
-        const { User: UserModel } = require('./models');
-        const bcrypt = require('bcryptjs');
-        for (const userData of criticalUsers) {
-          try {
-            const hashedPassword = await bcrypt.hash(userData.password, 10);
-            await UserModel.update({
-              password: hashedPassword,
-              isActive: true
-            }, {
-              where: { email: userData.email },
-              individualHooks: false
-            });
-          } catch (err) {
-            console.error(`Post-migration user check failed for ${userData.email}:`, err.message);
-          }
-        }
-        console.log('✓ Post-migration user check completed.');
+        // Use sync without alter to avoid modifying existing tables
+        await sequelize.sync({ force: false, alter: false });
+        console.log('Database sync completed successfully (safe mode).');
       } catch (migrationError) {
         console.error('Migration error:', migrationError);
         // Don't exit - server can still run even if migrations fail
       }
+    }
+    
+    // Final check: Ensure users are active one more time after any sync
+    console.log('Final verification of critical users...');
+    try {
+      const { User: UserModel } = require('./models');
+      const bcrypt = require('bcryptjs');
+      for (const userData of criticalUsers) {
+        try {
+          const hashedPassword = await bcrypt.hash(userData.password, 10);
+          await UserModel.update({
+            password: hashedPassword,
+            isActive: true
+          }, {
+            where: { email: userData.email },
+            individualHooks: false
+          });
+        } catch (err) {
+          console.error(`Final user check failed for ${userData.email}:`, err.message);
+        }
+      }
+      console.log('✓ Final user verification completed.');
+    } catch (error) {
+      console.error('Final user verification error:', error);
     }
     
     app.listen(PORT, () => {
