@@ -154,5 +154,34 @@ router.post('/reset-passwords', async (req, res) => {
   }
 });
 
+// DEBUG ENDPOINT: Check user status
+router.get('/check-user/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+    const user = await User.findOne({ 
+      where: { email },
+      attributes: ['id', 'email', 'firstName', 'lastName', 'role', 'isActive', 'createdAt', 'updatedAt']
+    });
+
+    if (!user) {
+      return res.json({
+        exists: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      exists: true,
+      user: user.toJSON(),
+      isActive: user.isActive
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
 
