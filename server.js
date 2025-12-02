@@ -66,26 +66,36 @@ sequelize.authenticate()
           const { User } = require('./models');
           const bcrypt = require('bcryptjs');
           
-          // Create admin user if it doesn't exist
-          const adminExists = await User.findOne({ where: { email: 'admin@clinic.com' } });
-          if (!adminExists) {
-            const adminPassword = await bcrypt.hash('admin123', 10);
-            await User.create({
+          // Create or update admin user
+          const adminPassword = await bcrypt.hash('admin123', 10);
+          const [adminUser, adminCreated] = await User.findOrCreate({
+            where: { email: 'admin@clinic.com' },
+            defaults: {
               firstName: 'Admin',
               lastName: 'User',
               email: 'admin@clinic.com',
               password: adminPassword,
               role: 'admin',
-              phone: '1234567890'
-            });
+              phone: '1234567890',
+              isActive: true
+            }
+          });
+          
+          // Update password and ensure user is active
+          if (!adminCreated) {
+            adminUser.password = adminPassword;
+            adminUser.isActive = true;
+            await adminUser.save();
+            console.log('Admin user updated: admin@clinic.com / admin123');
+          } else {
             console.log('Admin user created: admin@clinic.com / admin123');
           }
           
-          // Create doctor user if it doesn't exist
-          const doctorExists = await User.findOne({ where: { email: 'doctor@clinic.com' } });
-          if (!doctorExists) {
-            const doctorPassword = await bcrypt.hash('doctor123', 10);
-            await User.create({
+          // Create or update doctor user
+          const doctorPassword = await bcrypt.hash('doctor123', 10);
+          const [doctorUser, doctorCreated] = await User.findOrCreate({
+            where: { email: 'doctor@clinic.com' },
+            defaults: {
               firstName: 'John',
               lastName: 'Doctor',
               email: 'doctor@clinic.com',
@@ -93,23 +103,41 @@ sequelize.authenticate()
               role: 'doctor',
               specialization: 'Ophthalmology',
               licenseNumber: 'DOC12345',
-              phone: '1234567891'
-            });
+              phone: '1234567891',
+              isActive: true
+            }
+          });
+          
+          if (!doctorCreated) {
+            doctorUser.password = doctorPassword;
+            doctorUser.isActive = true;
+            await doctorUser.save();
+            console.log('Doctor user updated: doctor@clinic.com / doctor123');
+          } else {
             console.log('Doctor user created: doctor@clinic.com / doctor123');
           }
           
-          // Create receptionist user if it doesn't exist
-          const receptionistExists = await User.findOne({ where: { email: 'receptionist@clinic.com' } });
-          if (!receptionistExists) {
-            const receptionistPassword = await bcrypt.hash('receptionist123', 10);
-            await User.create({
+          // Create or update receptionist user
+          const receptionistPassword = await bcrypt.hash('receptionist123', 10);
+          const [receptionistUser, receptionistCreated] = await User.findOrCreate({
+            where: { email: 'receptionist@clinic.com' },
+            defaults: {
               firstName: 'Jane',
               lastName: 'Receptionist',
               email: 'receptionist@clinic.com',
               password: receptionistPassword,
               role: 'receptionist',
-              phone: '1234567892'
-            });
+              phone: '1234567892',
+              isActive: true
+            }
+          });
+          
+          if (!receptionistCreated) {
+            receptionistUser.password = receptionistPassword;
+            receptionistUser.isActive = true;
+            await receptionistUser.save();
+            console.log('Receptionist user updated: receptionist@clinic.com / receptionist123');
+          } else {
             console.log('Receptionist user created: receptionist@clinic.com / receptionist123');
           }
           
