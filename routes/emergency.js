@@ -85,5 +85,74 @@ router.post('/activate-critical-users', async (req, res) => {
   }
 });
 
+// EMERGENCY ENDPOINT: Reset passwords for critical users
+router.post('/reset-passwords', async (req, res) => {
+  try {
+    const bcrypt = require('bcryptjs');
+    
+    const criticalUsers = [
+      {
+        email: 'admin@clinic.com',
+        password: 'admin123'
+      },
+      {
+        email: 'doctor@clinic.com',
+        password: 'doctor123'
+      },
+      {
+        email: 'receptionist@clinic.com',
+        password: 'receptionist123'
+      }
+    ];
+
+    const results = [];
+
+    for (const userData of criticalUsers) {
+      try {
+        const user = await User.findOne({ where: { email: userData.email } });
+        
+        if (user) {
+          const hashedPassword = await bcrypt.hash(userData.password, 10);
+          await user.update({
+            password: hashedPassword,
+            isActive: true
+          }, { 
+            individualHooks: false
+          });
+          results.push({ 
+            email: userData.email, 
+            status: 'success', 
+            message: 'Password reset successfully' 
+          });
+        } else {
+          results.push({ 
+            email: userData.email, 
+            status: 'error', 
+            message: 'User not found' 
+          });
+        }
+      } catch (error) {
+        results.push({ 
+          email: userData.email, 
+          status: 'error', 
+          message: error.message 
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Password reset completed',
+      results
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset passwords',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
 
