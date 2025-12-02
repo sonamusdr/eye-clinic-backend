@@ -9,6 +9,7 @@ const Invoice = require('./Invoice');
 const Payment = require('./Payment');
 const AuditLog = require('./AuditLog');
 const Notification = require('./Notification');
+const PatientForm = require('./PatientForm');
 
 // Define associations
 User.hasMany(Appointment, { foreignKey: 'doctorId', as: 'doctorAppointments' });
@@ -35,6 +36,9 @@ Payment.belongsTo(Invoice, { foreignKey: 'invoiceId' });
 User.hasMany(Notification, { foreignKey: 'userId' });
 Notification.belongsTo(User, { foreignKey: 'userId' });
 
+Appointment.hasOne(PatientForm, { foreignKey: 'appointmentId' });
+PatientForm.belongsTo(Appointment, { foreignKey: 'appointmentId' });
+
 module.exports = {
   sequelize,
   User,
@@ -46,6 +50,7 @@ module.exports = {
   Invoice,
   Payment,
   AuditLog,
-  Notification
+  Notification,
+  PatientForm
 };
 

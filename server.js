@@ -34,6 +34,7 @@ app.use('/api/staff', require('./routes/staff'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/telemedicine', require('./routes/telemedicine'));
+app.use('/api/patient-forms', require('./routes/patientForms'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
