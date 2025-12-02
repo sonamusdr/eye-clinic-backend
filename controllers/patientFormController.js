@@ -41,64 +41,77 @@ exports.generateFormLink = async (req, res) => {
 exports.getFormByToken = async (req, res) => {
   try {
     const { token } = req.params;
+    
+    console.log('Looking for form with token:', token);
 
-    const form = await PatientForm.findOne({
-      where: { token },
-      include: [
-        {
-          model: Appointment,
-          as: 'Appointment',
-          required: false,
-          include: [
-            {
-              model: Patient,
-              attributes: ['id', 'firstName', 'lastName', 'email', 'phone']
-            }
-          ]
-        },
-        {
-          model: Patient,
-          as: 'Patient',
-          required: false,
-          attributes: ['id', 'firstName', 'lastName', 'email', 'phone']
-        }
-      ]
+    // First, try to find form without includes to avoid alias issues
+    let form = await PatientForm.findOne({
+      where: { token }
     });
 
     if (!form) {
-      return res.status(404).json({ message: 'Form not found' });
+      console.log('Form not found with token:', token);
+      return res.status(404).json({ message: 'Formulario no encontrado o expirado' });
     }
+
+    console.log('Form found:', form.id, 'Type:', form.formType, 'Completed:', form.isCompleted);
 
     // Check if form is expired
     if (form.expiresAt && new Date() > new Date(form.expiresAt)) {
-      return res.status(400).json({ message: 'This form has expired' });
+      console.log('Form expired:', form.expiresAt);
+      return res.status(400).json({ message: 'Este formulario ha expirado' });
     }
 
     // Check if already completed
     if (form.isCompleted) {
-      return res.status(400).json({ message: 'This form has already been completed' });
+      console.log('Form already completed');
+      return res.status(400).json({ message: 'Este formulario ya ha sido completado' });
     }
 
-    // Get patient name for display
+    // Try to get patient name if patientId exists
     let patientName = null;
-    if (form.Appointment && form.Appointment.Patient) {
-      patientName = `${form.Appointment.Patient.firstName} ${form.Appointment.Patient.lastName}`;
-    } else if (form.Patient) {
-      patientName = `${form.Patient.firstName} ${form.Patient.lastName}`;
+    if (form.patientId) {
+      try {
+        const patient = await Patient.findByPk(form.patientId, {
+          attributes: ['id', 'firstName', 'lastName', 'email', 'phone']
+        });
+        if (patient) {
+          patientName = `${patient.firstName} ${patient.lastName}`;
+        }
+      } catch (err) {
+        console.log('Could not load patient:', err.message);
+      }
+    }
+
+    // Try to get appointment patient if appointmentId exists
+    if (!patientName && form.appointmentId) {
+      try {
+        const appointment = await Appointment.findByPk(form.appointmentId, {
+          include: [{
+            model: Patient,
+            attributes: ['id', 'firstName', 'lastName', 'email', 'phone']
+          }]
+        });
+        if (appointment && appointment.Patient) {
+          patientName = `${appointment.Patient.firstName} ${appointment.Patient.lastName}`;
+        }
+      } catch (err) {
+        console.log('Could not load appointment:', err.message);
+      }
     }
 
     res.json({
       success: true,
       form: {
         id: form.id,
-        formType: form.formType,
-        appointment: form.Appointment,
-        patient: form.Patient,
-        patientName,
-        isCompleted: form.isCompleted
+        formType: form.formType || 'registration',
+        patientName: patientName || 'Nuevo Paciente',
+        isCompleted: form.isCompleted,
+        expiresAt: form.expiresAt
       }
     });
   } catch (error) {
+    console.error('Error in getFormByToken:', error);
     res.status(500).json({ message: error.message });
   }
 };
