@@ -256,40 +256,33 @@ exports.generateRegistrationFormLink = async (req, res) => {
 
     if (!form) {
       // Create new registration form
+      // Generate token explicitly to ensure it's set
+      const crypto = require('crypto');
+      const token = crypto.randomBytes(32).toString('hex');
+      
       // Build form data carefully to avoid NOT NULL violations
       const formData = {
-        patientId: actualPatientId || null,
-        appointmentId: null,
-        formType: 'registration'
+        token: token, // Explicitly set token
+        formType: 'registration',
+        appointmentId: null
       };
       
-      // Remove null values that might cause issues
-      if (!formData.patientId) {
-        delete formData.patientId;
+      // Add patientId only if it exists
+      if (actualPatientId) {
+        formData.patientId = actualPatientId;
       }
+      
+      // Set expiration date
+      const expiresDate = new Date();
+      expiresDate.setDate(expiresDate.getDate() + 30);
+      formData.expiresAt = expiresDate;
       
       try {
         form = await PatientForm.create(formData);
       } catch (error) {
         console.error('Error creating form:', error);
         console.error('Form data attempted:', formData);
-        
-        // If error mentions a specific column, try without it
-        if (error.message && (error.message.includes('appointmentId') || error.message.includes('NOT NULL'))) {
-          // Try creating with only required fields
-          const minimalFormData = {
-            formType: 'registration'
-          };
-          
-          if (actualPatientId) {
-            minimalFormData.patientId = actualPatientId;
-          }
-          
-          form = await PatientForm.create(minimalFormData);
-        } else {
-          // Re-throw if it's a different error
-          throw error;
-        }
+        throw error; // Re-throw to see the actual error
       }
     }
 

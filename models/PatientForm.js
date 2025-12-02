@@ -55,15 +55,23 @@ const PatientForm = sequelize.define('PatientForm', {
   tableName: 'patient_forms',
   timestamps: true,
   hooks: {
-    beforeCreate: (form) => {
+    beforeCreate: async (form) => {
+      // ALWAYS generate token - this is required
       if (!form.token) {
         form.token = crypto.randomBytes(32).toString('hex');
       }
+      
+      // Ensure token is set (fallback)
+      if (!form.token || form.token === null) {
+        form.token = crypto.randomBytes(32).toString('hex');
+      }
+      
       // Set formType if not provided (default to appointment for backward compatibility)
       if (!form.formType) {
         // If no appointmentId, it's a registration form
         form.formType = form.appointmentId ? 'appointment' : 'registration';
       }
+      
       // Form expires 30 days from creation
       if (!form.expiresAt) {
         const expiresDate = new Date();
