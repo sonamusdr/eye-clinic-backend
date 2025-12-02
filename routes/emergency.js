@@ -186,46 +186,75 @@ router.get('/check-user/:email', async (req, res) => {
   }
 });
 
-// EMERGENCY ENDPOINT: Add formType column if it doesn't exist
-router.post('/migrate-formtype', async (req, res) => {
+// EMERGENCY ENDPOINT: Fix patient_forms table structure
+router.post('/fix-patient-forms-table', async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
+    const results = [];
     
-    // Check if column exists
-    const [results] = await sequelize.query(`
+    // 1. Add formType column if it doesn't exist
+    const [formTypeCheck] = await sequelize.query(`
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_name = 'patient_forms' AND column_name = 'formType'
     `);
     
-    if (results.length === 0) {
-      // Column doesn't exist, add it
+    if (formTypeCheck.length === 0) {
       await sequelize.query(`
         ALTER TABLE patient_forms 
         ADD COLUMN formType VARCHAR(20)
       `);
-      
-      // Set default values for existing rows
       await sequelize.query(`
         UPDATE patient_forms 
         SET formType = 'appointment' 
         WHERE formType IS NULL
       `);
-      
-      res.json({
-        success: true,
-        message: 'formType column added successfully'
-      });
+      results.push('formType column added');
     } else {
-      res.json({
-        success: true,
-        message: 'formType column already exists'
-      });
+      results.push('formType column already exists');
     }
+    
+    // 2. Make appointmentId nullable if it's not
+    try {
+      await sequelize.query(`
+        ALTER TABLE patient_forms 
+        ALTER COLUMN "appointmentId" DROP NOT NULL
+      `);
+      results.push('appointmentId made nullable');
+    } catch (error) {
+      if (error.message.includes('does not exist') || error.message.includes('already')) {
+        results.push('appointmentId is already nullable');
+      } else {
+        results.push(`appointmentId: ${error.message}`);
+      }
+    }
+    
+    // 3. Add patientId column if it doesn't exist
+    const [patientIdCheck] = await sequelize.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'patient_forms' AND column_name = 'patientId'
+    `);
+    
+    if (patientIdCheck.length === 0) {
+      await sequelize.query(`
+        ALTER TABLE patient_forms 
+        ADD COLUMN "patientId" UUID
+      `);
+      results.push('patientId column added');
+    } else {
+      results.push('patientId column already exists');
+    }
+    
+    res.json({
+      success: true,
+      message: 'Table structure fixed',
+      changes: results
+    });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Failed to migrate formType column',
+      message: 'Failed to fix table structure',
       error: error.message
     });
   }
