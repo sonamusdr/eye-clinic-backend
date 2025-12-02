@@ -10,11 +10,24 @@ const PatientForm = sequelize.define('PatientForm', {
   },
   appointmentId: {
     type: DataTypes.UUID,
-    allowNull: false,
+    allowNull: true, // Now optional - can be for patient registration without appointment
     references: {
       model: 'appointments',
       key: 'id'
     }
+  },
+  patientId: {
+    type: DataTypes.UUID,
+    allowNull: true, // Optional - for new patient registration
+    references: {
+      model: 'patients',
+      key: 'id'
+    }
+  },
+  formType: {
+    type: DataTypes.ENUM('appointment', 'registration'),
+    allowNull: false,
+    defaultValue: 'appointment'
   },
   token: {
     type: DataTypes.STRING,

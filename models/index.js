@@ -36,8 +36,11 @@ Payment.belongsTo(Invoice, { foreignKey: 'invoiceId' });
 User.hasMany(Notification, { foreignKey: 'userId' });
 Notification.belongsTo(User, { foreignKey: 'userId' });
 
-Appointment.hasOne(PatientForm, { foreignKey: 'appointmentId' });
-PatientForm.belongsTo(Appointment, { foreignKey: 'appointmentId' });
+Appointment.hasOne(PatientForm, { foreignKey: 'appointmentId', as: 'patientForm' });
+PatientForm.belongsTo(Appointment, { foreignKey: 'appointmentId', as: 'Appointment' });
+
+Patient.hasMany(PatientForm, { foreignKey: 'patientId', as: 'registrationForms' });
+PatientForm.belongsTo(Patient, { foreignKey: 'patientId', as: 'Patient' });
 
 module.exports = {
   sequelize,

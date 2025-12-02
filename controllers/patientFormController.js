@@ -47,12 +47,18 @@ exports.getFormByToken = async (req, res) => {
       include: [
         {
           model: Appointment,
+          required: false,
           include: [
             {
               model: Patient,
               attributes: ['id', 'firstName', 'lastName', 'email', 'phone']
             }
           ]
+        },
+        {
+          model: Patient,
+          required: false,
+          attributes: ['id', 'firstName', 'lastName', 'email', 'phone']
         }
       ]
     });
@@ -62,7 +68,7 @@ exports.getFormByToken = async (req, res) => {
     }
 
     // Check if form is expired
-    if (new Date() > new Date(form.expiresAt)) {
+    if (form.expiresAt && new Date() > new Date(form.expiresAt)) {
       return res.status(400).json({ message: 'This form has expired' });
     }
 
@@ -71,11 +77,22 @@ exports.getFormByToken = async (req, res) => {
       return res.status(400).json({ message: 'This form has already been completed' });
     }
 
+    // Get patient name for display
+    let patientName = null;
+    if (form.Appointment && form.Appointment.Patient) {
+      patientName = `${form.Appointment.Patient.firstName} ${form.Appointment.Patient.lastName}`;
+    } else if (form.Patient) {
+      patientName = `${form.Patient.firstName} ${form.Patient.lastName}`;
+    }
+
     res.json({
       success: true,
       form: {
         id: form.id,
+        formType: form.formType,
         appointment: form.Appointment,
+        patient: form.Patient,
+        patientName,
         isCompleted: form.isCompleted
       }
     });
@@ -123,16 +140,77 @@ exports.submitForm = async (req, res) => {
       completedAt: new Date()
     });
 
-    // Optionally update patient information if provided
-    if (formData.patientInfo && form.Appointment.Patient) {
+    // Handle form submission based on form type
+    if (form.formType === 'registration') {
+      // For registration forms, create or update patient
+      const patientInfo = formData.patientInfo;
+      
+      if (patientInfo) {
+        let patient = null;
+        
+        // If form has patientId, update existing patient
+        if (form.patientId) {
+          patient = await Patient.findByPk(form.patientId);
+          if (patient) {
+            // Update existing patient
+            await patient.update({
+              firstName: patientInfo.firstName || patient.firstName,
+              lastName: patientInfo.lastName || patient.lastName,
+              dateOfBirth: patientInfo.dateOfBirth || patient.dateOfBirth,
+              gender: patientInfo.gender || patient.gender,
+              email: patientInfo.email || patient.email,
+              phone: patientInfo.phone || patient.phone,
+              address: patientInfo.address || patient.address,
+              city: patientInfo.city || patient.city,
+              state: patientInfo.state || patient.state,
+              zipCode: patientInfo.zipCode || patient.zipCode,
+              emergencyContactName: patientInfo.emergencyContactName || patient.emergencyContactName,
+              emergencyContactPhone: patientInfo.emergencyContactPhone || patient.emergencyContactPhone,
+              emergencyContactRelation: patientInfo.emergencyContactRelation || patient.emergencyContactRelation,
+              medicalHistory: patientInfo.medicalHistory || patient.medicalHistory,
+              allergies: patientInfo.allergies || patient.allergies,
+              insuranceProvider: formData.insuranceInfo?.insuranceProvider || patient.insuranceProvider,
+              insurancePolicyNumber: formData.insuranceInfo?.insurancePolicyNumber || patient.insurancePolicyNumber,
+              insuranceGroupNumber: formData.insuranceInfo?.insuranceGroupNumber || patient.insuranceGroupNumber
+            });
+          }
+        } else {
+          // Create new patient
+          patient = await Patient.create({
+            firstName: patientInfo.firstName,
+            lastName: patientInfo.lastName,
+            dateOfBirth: patientInfo.dateOfBirth,
+            gender: patientInfo.gender,
+            email: patientInfo.email,
+            phone: patientInfo.phone,
+            address: patientInfo.address,
+            city: patientInfo.city,
+            state: patientInfo.state,
+            zipCode: patientInfo.zipCode,
+            emergencyContactName: patientInfo.emergencyContactName,
+            emergencyContactPhone: patientInfo.emergencyContactPhone,
+            emergencyContactRelation: patientInfo.emergencyContactRelation,
+            medicalHistory: patientInfo.medicalHistory || formData.medicalInfo?.medicalHistory,
+            allergies: patientInfo.allergies || formData.medicalInfo?.allergies,
+            insuranceProvider: formData.insuranceInfo?.insuranceProvider,
+            insurancePolicyNumber: formData.insuranceInfo?.insurancePolicyNumber,
+            insuranceGroupNumber: formData.insuranceInfo?.insuranceGroupNumber
+          });
+          
+          // Update form with patientId
+          await form.update({ patientId: patient.id });
+        }
+      }
+    } else if (form.formType === 'appointment' && form.Appointment && form.Appointment.Patient) {
+      // For appointment forms, update existing patient
       const patient = form.Appointment.Patient;
       const updates = {};
       
-      if (formData.patientInfo.email) updates.email = formData.patientInfo.email;
-      if (formData.patientInfo.phone) updates.phone = formData.patientInfo.phone;
-      if (formData.patientInfo.address) updates.address = formData.patientInfo.address;
-      if (formData.patientInfo.medicalHistory) updates.medicalHistory = formData.patientInfo.medicalHistory;
-      if (formData.patientInfo.allergies) updates.allergies = formData.patientInfo.allergies;
+      if (formData.patientInfo?.email) updates.email = formData.patientInfo.email;
+      if (formData.patientInfo?.phone) updates.phone = formData.patientInfo.phone;
+      if (formData.patientInfo?.address) updates.address = formData.patientInfo.address;
+      if (formData.medicalInfo?.medicalHistory) updates.medicalHistory = formData.medicalInfo.medicalHistory;
+      if (formData.medicalInfo?.allergies) updates.allergies = formData.medicalInfo.allergies;
 
       if (Object.keys(updates).length > 0) {
         await patient.update(updates);
@@ -142,6 +220,54 @@ exports.submitForm = async (req, res) => {
     res.json({
       success: true,
       message: 'Form submitted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Generate registration form link for a patient (or new patient)
+exports.generateRegistrationFormLink = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    // If patientId is provided, verify patient exists
+    if (patientId && patientId !== 'new') {
+      const patient = await Patient.findByPk(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: 'Patient not found' });
+      }
+    }
+
+    // Check if form already exists for this patient
+    let form = null;
+    if (patientId && patientId !== 'new') {
+      form = await PatientForm.findOne({
+        where: { 
+          patientId,
+          formType: 'registration',
+          isCompleted: false
+        }
+      });
+    }
+
+    if (!form) {
+      // Create new registration form
+      form = await PatientForm.create({
+        patientId: patientId && patientId !== 'new' ? patientId : null,
+        formType: 'registration'
+      });
+    }
+
+    // Generate the public URL
+    const frontendUrl = process.env.FRONTEND_URL || 'https://eyeclinic.aledsystems.com';
+    const formUrl = `${frontendUrl}/patient-form/${form.token}`;
+
+    res.json({
+      success: true,
+      formUrl,
+      token: form.token,
+      isCompleted: form.isCompleted
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
