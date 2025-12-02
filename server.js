@@ -61,82 +61,80 @@ sequelize.authenticate()
         await sequelize.sync({ force: false, alter: true });
         console.log('Database migrations completed successfully.');
         
-        // Always ensure default users exist and are active (in production)
-        if (process.env.NODE_ENV === 'production' || process.env.RUN_SEED === 'true') {
-          console.log('Ensuring default users are active...');
-          const { User } = require('./models');
-          const bcrypt = require('bcryptjs');
-          
-          // Ensure admin user exists and is active
-          const adminUser = await User.findOne({ where: { email: 'admin@clinic.com' } });
-          if (adminUser) {
-            await adminUser.update({
-              password: 'admin123', // Will be hashed by beforeUpdate hook
-              isActive: true
-            }, { individualHooks: true });
-            console.log('Admin user activated: admin@clinic.com / admin123');
-          } else {
-            const adminPassword = await bcrypt.hash('admin123', 10);
-            await User.create({
-              firstName: 'Admin',
-              lastName: 'User',
-              email: 'admin@clinic.com',
-              password: adminPassword,
-              role: 'admin',
-              phone: '1234567890',
-              isActive: true
-            });
-            console.log('Admin user created: admin@clinic.com / admin123');
+        // CRITICAL: Always ensure default users exist and are active
+        // This runs on EVERY server startup to prevent lockouts
+        console.log('Ensuring critical system users are active...');
+        const { User } = require('./models');
+        const bcrypt = require('bcryptjs');
+        
+        // Critical system users that MUST always be active
+        const criticalUsers = [
+          {
+            email: 'admin@clinic.com',
+            firstName: 'Admin',
+            lastName: 'User',
+            password: 'admin123',
+            role: 'admin',
+            phone: '1234567890'
+          },
+          {
+            email: 'doctor@clinic.com',
+            firstName: 'John',
+            lastName: 'Doctor',
+            password: 'doctor123',
+            role: 'doctor',
+            specialization: 'Ophthalmology',
+            licenseNumber: 'DOC12345',
+            phone: '1234567891'
+          },
+          {
+            email: 'receptionist@clinic.com',
+            firstName: 'Jane',
+            lastName: 'Receptionist',
+            password: 'receptionist123',
+            role: 'receptionist',
+            phone: '1234567892'
           }
-          
-          // Ensure doctor user exists and is active
-          const doctorUser = await User.findOne({ where: { email: 'doctor@clinic.com' } });
-          if (doctorUser) {
-            await doctorUser.update({
-              password: 'doctor123', // Will be hashed by beforeUpdate hook
-              isActive: true
-            }, { individualHooks: true });
-            console.log('Doctor user activated: doctor@clinic.com / doctor123');
-          } else {
-            const doctorPassword = await bcrypt.hash('doctor123', 10);
-            await User.create({
-              firstName: 'John',
-              lastName: 'Doctor',
-              email: 'doctor@clinic.com',
-              password: doctorPassword,
-              role: 'doctor',
-              specialization: 'Ophthalmology',
-              licenseNumber: 'DOC12345',
-              phone: '1234567891',
-              isActive: true
-            });
-            console.log('Doctor user created: doctor@clinic.com / doctor123');
+        ];
+        
+        // Use upsert to ensure users exist and are always active
+        for (const userData of criticalUsers) {
+          try {
+            const existingUser = await User.findOne({ where: { email: userData.email } });
+            
+            if (existingUser) {
+              // Force activation and password reset (in case it was changed)
+              const hashedPassword = await bcrypt.hash(userData.password, 10);
+              await existingUser.update({
+                password: hashedPassword,
+                isActive: true,
+                firstName: userData.firstName,
+                lastName: userData.lastName,
+                role: userData.role,
+                phone: userData.phone,
+                ...(userData.specialization && { specialization: userData.specialization }),
+                ...(userData.licenseNumber && { licenseNumber: userData.licenseNumber })
+              }, { 
+                individualHooks: false // Skip hooks to avoid validation errors
+              });
+              console.log(`✓ Critical user activated: ${userData.email}`);
+            } else {
+              // Create new user
+              const hashedPassword = await bcrypt.hash(userData.password, 10);
+              await User.create({
+                ...userData,
+                password: hashedPassword,
+                isActive: true
+              });
+              console.log(`✓ Critical user created: ${userData.email}`);
+            }
+          } catch (error) {
+            console.error(`ERROR: Failed to ensure user ${userData.email} is active:`, error.message);
+            // Don't throw - continue with other users
           }
-          
-          // Ensure receptionist user exists and is active
-          const receptionistUser = await User.findOne({ where: { email: 'receptionist@clinic.com' } });
-          if (receptionistUser) {
-            await receptionistUser.update({
-              password: 'receptionist123', // Will be hashed by beforeUpdate hook
-              isActive: true
-            }, { individualHooks: true });
-            console.log('Receptionist user activated: receptionist@clinic.com / receptionist123');
-          } else {
-            const receptionistPassword = await bcrypt.hash('receptionist123', 10);
-            await User.create({
-              firstName: 'Jane',
-              lastName: 'Receptionist',
-              email: 'receptionist@clinic.com',
-              password: receptionistPassword,
-              role: 'receptionist',
-              phone: '1234567892',
-              isActive: true
-            });
-            console.log('Receptionist user created: receptionist@clinic.com / receptionist123');
-          }
-          
-          console.log('Default users check completed.');
         }
+        
+        console.log('✓ Critical system users check completed.');
       } catch (migrationError) {
         console.error('Migration error:', migrationError);
         // Don't exit - server can still run even if migrations fail

@@ -66,6 +66,12 @@ const User = sequelize.define('User', {
       }
     },
     beforeUpdate: async (user) => {
+      // Prevent deactivation of critical system users
+      const criticalEmails = ['admin@clinic.com', 'doctor@clinic.com', 'receptionist@clinic.com'];
+      if (user.changed('isActive') && user.isActive === false && criticalEmails.includes(user.email)) {
+        throw new Error('Cannot deactivate critical system users');
+      }
+      
       if (user.changed('password')) {
         user.password = await bcrypt.hash(user.password, 10);
       }

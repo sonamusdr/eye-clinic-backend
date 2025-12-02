@@ -151,6 +151,14 @@ exports.deleteStaff = async (req, res) => {
       return res.status(404).json({ message: 'Staff member not found' });
     }
 
+    // Prevent deactivation of critical system users
+    const criticalEmails = ['admin@clinic.com', 'doctor@clinic.com', 'receptionist@clinic.com'];
+    if (criticalEmails.includes(staff.email)) {
+      return res.status(403).json({ 
+        message: 'Cannot deactivate critical system users. These accounts are required for system operation.' 
+      });
+    }
+
     await staff.update({ isActive: false });
 
     await AuditLog.create({
