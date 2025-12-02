@@ -256,36 +256,25 @@ exports.generateRegistrationFormLink = async (req, res) => {
 
     if (!form) {
       // Create new registration form
-      // Check if formType column exists by trying to create without it first
-      let formData = {
+      // Start with minimal data to avoid NOT NULL violations
+      const formData = {
         patientId: actualPatientId,
         appointmentId: null
       };
       
-      // Try to add formType, but handle case where column doesn't exist
       try {
-        // First, check if we can query the formType column
-        const testForm = await PatientForm.findOne({ 
-          limit: 1,
-          attributes: ['formType']
-        });
-        
-        // If we got here, the column exists, so we can use it
+        // Try to create with formType
         formData.formType = 'registration';
-      } catch (columnError) {
-        // Column doesn't exist yet - create without formType
-        console.log('formType column does not exist yet, creating form without it');
-      }
-      
-      form = await PatientForm.create(formData);
-      
-      // If formType wasn't set, try to update it (in case column exists but wasn't set)
-      if (!form.formType) {
-        try {
-          await form.update({ formType: 'registration' }, { individualHooks: false });
-        } catch (updateError) {
-          // Column doesn't exist - that's okay, we'll work without it
-          console.log('Could not update formType - column may not exist');
+        form = await PatientForm.create(formData);
+      } catch (error) {
+        // If error is about formType column not existing, create without it
+        if (error.message && error.message.includes('formType')) {
+          console.log('formType column does not exist, creating form without it');
+          delete formData.formType;
+          form = await PatientForm.create(formData);
+        } else {
+          // Re-throw if it's a different error
+          throw error;
         }
       }
     }
