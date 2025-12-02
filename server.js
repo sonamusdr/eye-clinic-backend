@@ -43,8 +43,78 @@ const PORT = process.env.PORT || 5000;
 
 // Database connection and server start
 sequelize.authenticate()
-  .then(() => {
+  .then(async () => {
     console.log('Database connection established successfully.');
+    
+    // Run migrations automatically on startup (only in production or if RUN_MIGRATIONS is set)
+    if (process.env.NODE_ENV === 'production' || process.env.RUN_MIGRATIONS === 'true') {
+      try {
+        console.log('Running database migrations...');
+        const models = require('./models');
+        await sequelize.sync({ force: false, alter: true });
+        console.log('Database migrations completed successfully.');
+        
+        // Run seed only on first deployment (check if RUN_SEED is set)
+        if (process.env.RUN_SEED === 'true') {
+          console.log('Running database seed...');
+          const { User } = require('./models');
+          const bcrypt = require('bcryptjs');
+          
+          // Create admin user if it doesn't exist
+          const adminExists = await User.findOne({ where: { email: 'admin@clinic.com' } });
+          if (!adminExists) {
+            const adminPassword = await bcrypt.hash('admin123', 10);
+            await User.create({
+              firstName: 'Admin',
+              lastName: 'User',
+              email: 'admin@clinic.com',
+              password: adminPassword,
+              role: 'admin',
+              phone: '1234567890'
+            });
+            console.log('Admin user created: admin@clinic.com / admin123');
+          }
+          
+          // Create doctor user if it doesn't exist
+          const doctorExists = await User.findOne({ where: { email: 'doctor@clinic.com' } });
+          if (!doctorExists) {
+            const doctorPassword = await bcrypt.hash('doctor123', 10);
+            await User.create({
+              firstName: 'John',
+              lastName: 'Doctor',
+              email: 'doctor@clinic.com',
+              password: doctorPassword,
+              role: 'doctor',
+              specialization: 'Ophthalmology',
+              licenseNumber: 'DOC12345',
+              phone: '1234567891'
+            });
+            console.log('Doctor user created: doctor@clinic.com / doctor123');
+          }
+          
+          // Create receptionist user if it doesn't exist
+          const receptionistExists = await User.findOne({ where: { email: 'receptionist@clinic.com' } });
+          if (!receptionistExists) {
+            const receptionistPassword = await bcrypt.hash('receptionist123', 10);
+            await User.create({
+              firstName: 'Jane',
+              lastName: 'Receptionist',
+              email: 'receptionist@clinic.com',
+              password: receptionistPassword,
+              role: 'receptionist',
+              phone: '1234567892'
+            });
+            console.log('Receptionist user created: receptionist@clinic.com / receptionist123');
+          }
+          
+          console.log('Database seed completed.');
+        }
+      } catch (migrationError) {
+        console.error('Migration error:', migrationError);
+        // Don't exit - server can still run even if migrations fail
+      }
+    }
+    
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });
