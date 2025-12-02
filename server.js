@@ -61,88 +61,81 @@ sequelize.authenticate()
         await sequelize.sync({ force: false, alter: true });
         console.log('Database migrations completed successfully.');
         
-        // Run seed only on first deployment (check if RUN_SEED is set)
-        if (process.env.RUN_SEED === 'true') {
-          console.log('Running database seed...');
+        // Always ensure default users exist and are active (in production)
+        if (process.env.NODE_ENV === 'production' || process.env.RUN_SEED === 'true') {
+          console.log('Ensuring default users are active...');
           const { User } = require('./models');
           const bcrypt = require('bcryptjs');
           
-          // Create or update admin user - force password update
-          const [adminUser, adminCreated] = await User.findOrCreate({
-            where: { email: 'admin@clinic.com' },
-            defaults: {
-              firstName: 'Admin',
-              lastName: 'User',
-              email: 'admin@clinic.com',
-              password: 'admin123', // Will be hashed by beforeCreate hook
-              role: 'admin',
-              phone: '1234567890',
-              isActive: true
-            }
-          });
-          
-          // Force update password and ensure user is active using update() with hooks
-          if (!adminCreated) {
+          // Ensure admin user exists and is active
+          const adminUser = await User.findOne({ where: { email: 'admin@clinic.com' } });
+          if (adminUser) {
             await adminUser.update({
               password: 'admin123', // Will be hashed by beforeUpdate hook
               isActive: true
             }, { individualHooks: true });
-            console.log('Admin user updated: admin@clinic.com / admin123');
+            console.log('Admin user activated: admin@clinic.com / admin123');
           } else {
+            const adminPassword = await bcrypt.hash('admin123', 10);
+            await User.create({
+              firstName: 'Admin',
+              lastName: 'User',
+              email: 'admin@clinic.com',
+              password: adminPassword,
+              role: 'admin',
+              phone: '1234567890',
+              isActive: true
+            });
             console.log('Admin user created: admin@clinic.com / admin123');
           }
           
-          // Create or update doctor user
-          const [doctorUser, doctorCreated] = await User.findOrCreate({
-            where: { email: 'doctor@clinic.com' },
-            defaults: {
+          // Ensure doctor user exists and is active
+          const doctorUser = await User.findOne({ where: { email: 'doctor@clinic.com' } });
+          if (doctorUser) {
+            await doctorUser.update({
+              password: 'doctor123', // Will be hashed by beforeUpdate hook
+              isActive: true
+            }, { individualHooks: true });
+            console.log('Doctor user activated: doctor@clinic.com / doctor123');
+          } else {
+            const doctorPassword = await bcrypt.hash('doctor123', 10);
+            await User.create({
               firstName: 'John',
               lastName: 'Doctor',
               email: 'doctor@clinic.com',
-              password: 'doctor123', // Will be hashed by beforeCreate hook
+              password: doctorPassword,
               role: 'doctor',
               specialization: 'Ophthalmology',
               licenseNumber: 'DOC12345',
               phone: '1234567891',
               isActive: true
-            }
-          });
-          
-          if (!doctorCreated) {
-            await doctorUser.update({
-              password: 'doctor123', // Will be hashed by beforeUpdate hook
-              isActive: true
-            }, { individualHooks: true });
-            console.log('Doctor user updated: doctor@clinic.com / doctor123');
-          } else {
+            });
             console.log('Doctor user created: doctor@clinic.com / doctor123');
           }
           
-          // Create or update receptionist user
-          const [receptionistUser, receptionistCreated] = await User.findOrCreate({
-            where: { email: 'receptionist@clinic.com' },
-            defaults: {
-              firstName: 'Jane',
-              lastName: 'Receptionist',
-              email: 'receptionist@clinic.com',
-              password: 'receptionist123', // Will be hashed by beforeCreate hook
-              role: 'receptionist',
-              phone: '1234567892',
-              isActive: true
-            }
-          });
-          
-          if (!receptionistCreated) {
+          // Ensure receptionist user exists and is active
+          const receptionistUser = await User.findOne({ where: { email: 'receptionist@clinic.com' } });
+          if (receptionistUser) {
             await receptionistUser.update({
               password: 'receptionist123', // Will be hashed by beforeUpdate hook
               isActive: true
             }, { individualHooks: true });
-            console.log('Receptionist user updated: receptionist@clinic.com / receptionist123');
+            console.log('Receptionist user activated: receptionist@clinic.com / receptionist123');
           } else {
+            const receptionistPassword = await bcrypt.hash('receptionist123', 10);
+            await User.create({
+              firstName: 'Jane',
+              lastName: 'Receptionist',
+              email: 'receptionist@clinic.com',
+              password: receptionistPassword,
+              role: 'receptionist',
+              phone: '1234567892',
+              isActive: true
+            });
             console.log('Receptionist user created: receptionist@clinic.com / receptionist123');
           }
           
-          console.log('Database seed completed.');
+          console.log('Default users check completed.');
         }
       } catch (migrationError) {
         console.error('Migration error:', migrationError);
