@@ -54,21 +54,8 @@ sequelize.authenticate()
   .then(async () => {
     console.log('Database connection established successfully.');
     
-    // Run migrations automatically on startup (only in production or if RUN_MIGRATIONS is set)
-    if (process.env.NODE_ENV === 'production' || process.env.RUN_MIGRATIONS === 'true') {
-      try {
-        console.log('Running database migrations...');
-        const models = require('./models');
-        await sequelize.sync({ force: false, alter: true });
-        console.log('Database migrations completed successfully.');
-      } catch (migrationError) {
-        console.error('Migration error:', migrationError);
-        // Don't exit - server can still run even if migrations fail
-      }
-    }
-    
-    // CRITICAL: Always ensure default users exist and are active
-    // This runs on EVERY server startup to prevent lockouts - NO CONDITIONS
+    // CRITICAL: Always ensure default users exist and are active FIRST
+    // This runs BEFORE migrations to prevent lockouts
     console.log('Ensuring critical system users are active...');
     try {
       const { User } = require('./models');
@@ -104,15 +91,16 @@ sequelize.authenticate()
         }
       ];
       
-      // Use upsert to ensure users exist and are always active
+      // Use direct database update to ensure users exist and are always active
+      // This bypasses Sequelize hooks and ensures data is saved correctly
       for (const userData of criticalUsers) {
         try {
           const existingUser = await User.findOne({ where: { email: userData.email } });
+          const hashedPassword = await bcrypt.hash(userData.password, 10);
           
           if (existingUser) {
-            // Force activation and password reset (in case it was changed)
-            const hashedPassword = await bcrypt.hash(userData.password, 10);
-            await existingUser.update({
+            // Update directly in database to bypass hooks
+            await User.update({
               password: hashedPassword,
               isActive: true,
               firstName: userData.firstName,
@@ -121,13 +109,13 @@ sequelize.authenticate()
               phone: userData.phone,
               ...(userData.specialization && { specialization: userData.specialization }),
               ...(userData.licenseNumber && { licenseNumber: userData.licenseNumber })
-            }, { 
-              individualHooks: false // Skip hooks to avoid validation errors
+            }, {
+              where: { email: userData.email },
+              individualHooks: false
             });
             console.log(`✓ Critical user activated: ${userData.email}`);
           } else {
             // Create new user
-            const hashedPassword = await bcrypt.hash(userData.password, 10);
             await User.create({
               ...userData,
               password: hashedPassword,
@@ -146,6 +134,40 @@ sequelize.authenticate()
     } catch (error) {
       console.error('CRITICAL ERROR: Failed to ensure critical users:', error);
       // Don't exit - but log the error
+    }
+    
+    // Run migrations AFTER ensuring users are active
+    // This way users are protected even if migrations alter tables
+    if (process.env.NODE_ENV === 'production' || process.env.RUN_MIGRATIONS === 'true') {
+      try {
+        console.log('Running database migrations...');
+        const models = require('./models');
+        await sequelize.sync({ force: false, alter: true });
+        console.log('Database migrations completed successfully.');
+        
+        // Re-ensure users are active AFTER migrations (in case migrations reset something)
+        console.log('Re-checking critical users after migrations...');
+        const { User: UserModel } = require('./models');
+        const bcrypt = require('bcryptjs');
+        for (const userData of criticalUsers) {
+          try {
+            const hashedPassword = await bcrypt.hash(userData.password, 10);
+            await UserModel.update({
+              password: hashedPassword,
+              isActive: true
+            }, {
+              where: { email: userData.email },
+              individualHooks: false
+            });
+          } catch (err) {
+            console.error(`Post-migration user check failed for ${userData.email}:`, err.message);
+          }
+        }
+        console.log('✓ Post-migration user check completed.');
+      } catch (migrationError) {
+        console.error('Migration error:', migrationError);
+        // Don't exit - server can still run even if migrations fail
+      }
     }
     
     app.listen(PORT, () => {
