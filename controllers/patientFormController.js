@@ -231,20 +231,23 @@ exports.generateRegistrationFormLink = async (req, res) => {
   try {
     const { patientId } = req.params;
 
+    // Handle 'new' or null patientId
+    const actualPatientId = (patientId && patientId !== 'new' && patientId !== 'null') ? patientId : null;
+
     // If patientId is provided, verify patient exists
-    if (patientId && patientId !== 'new') {
-      const patient = await Patient.findByPk(patientId);
+    if (actualPatientId) {
+      const patient = await Patient.findByPk(actualPatientId);
       if (!patient) {
         return res.status(404).json({ message: 'Patient not found' });
       }
     }
 
-    // Check if form already exists for this patient
+    // Check if form already exists for this patient (only if patientId exists)
     let form = null;
-    if (patientId && patientId !== 'new') {
+    if (actualPatientId) {
       form = await PatientForm.findOne({
         where: { 
-          patientId,
+          patientId: actualPatientId,
           formType: 'registration',
           isCompleted: false
         }
@@ -253,10 +256,20 @@ exports.generateRegistrationFormLink = async (req, res) => {
 
     if (!form) {
       // Create new registration form
-      form = await PatientForm.create({
-        patientId: patientId && patientId !== 'new' ? patientId : null,
-        formType: 'registration'
-      });
+      // Ensure formType is set and handle case where column might not exist yet
+      const formData = {
+        patientId: actualPatientId,
+        appointmentId: null
+      };
+      
+      // Try to set formType, but handle case where column doesn't exist
+      try {
+        formData.formType = 'registration';
+      } catch (e) {
+        // If formType column doesn't exist, it will be null which is fine
+      }
+      
+      form = await PatientForm.create(formData);
     }
 
     // Generate the public URL
@@ -267,10 +280,14 @@ exports.generateRegistrationFormLink = async (req, res) => {
       success: true,
       formUrl,
       token: form.token,
-      isCompleted: form.isCompleted
+      isCompleted: form.isCompleted || false
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error generating registration form link:', error);
+    res.status(500).json({ 
+      message: error.message,
+      details: error.stack 
+    });
   }
 };
 

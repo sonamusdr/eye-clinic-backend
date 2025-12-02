@@ -26,7 +26,7 @@ const PatientForm = sequelize.define('PatientForm', {
   },
   formType: {
     type: DataTypes.ENUM('appointment', 'registration'),
-    allowNull: false,
+    allowNull: true, // Allow null temporarily for migration compatibility
     defaultValue: 'appointment'
   },
   token: {
