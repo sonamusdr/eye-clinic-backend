@@ -256,22 +256,36 @@ exports.generateRegistrationFormLink = async (req, res) => {
 
     if (!form) {
       // Create new registration form
-      // Start with minimal data to avoid NOT NULL violations
+      // Build form data carefully to avoid NOT NULL violations
       const formData = {
-        patientId: actualPatientId,
-        appointmentId: null
+        patientId: actualPatientId || null,
+        appointmentId: null,
+        formType: 'registration'
       };
       
+      // Remove null values that might cause issues
+      if (!formData.patientId) {
+        delete formData.patientId;
+      }
+      
       try {
-        // Try to create with formType
-        formData.formType = 'registration';
         form = await PatientForm.create(formData);
       } catch (error) {
-        // If error is about formType column not existing, create without it
-        if (error.message && error.message.includes('formType')) {
-          console.log('formType column does not exist, creating form without it');
-          delete formData.formType;
-          form = await PatientForm.create(formData);
+        console.error('Error creating form:', error);
+        console.error('Form data attempted:', formData);
+        
+        // If error mentions a specific column, try without it
+        if (error.message && (error.message.includes('appointmentId') || error.message.includes('NOT NULL'))) {
+          // Try creating with only required fields
+          const minimalFormData = {
+            formType: 'registration'
+          };
+          
+          if (actualPatientId) {
+            minimalFormData.patientId = actualPatientId;
+          }
+          
+          form = await PatientForm.create(minimalFormData);
         } else {
           // Re-throw if it's a different error
           throw error;
