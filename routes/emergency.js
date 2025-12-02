@@ -112,11 +112,14 @@ router.post('/reset-passwords', async (req, res) => {
         const user = await User.findOne({ where: { email: userData.email } });
         
         if (user) {
+          // Hash the password manually
           const hashedPassword = await bcrypt.hash(userData.password, 10);
-          await user.update({
+          // Update directly in database to bypass hooks
+          await User.update({
             password: hashedPassword,
             isActive: true
-          }, { 
+          }, {
+            where: { email: userData.email },
             individualHooks: false
           });
           results.push({ 
