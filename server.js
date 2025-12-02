@@ -10,26 +10,15 @@ dotenv.config();
 const app = express();
 
 // Middleware - CORS configuration
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  'https://eyeclinic.aledsystems.com',
-  'http://localhost:3000'
-].filter(Boolean); // Remove undefined values
-
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1 || !process.env.FRONTEND_URL) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: [
+    'https://eyeclinic.aledsystems.com',
+    process.env.FRONTEND_URL,
+    'http://localhost:3000'
+  ].filter(Boolean),
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
