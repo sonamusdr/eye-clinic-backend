@@ -35,6 +35,7 @@ app.use('/api/reports', require('./routes/reports'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/telemedicine', require('./routes/telemedicine'));
 app.use('/api/patient-forms', require('./routes/patientForms'));
+app.use('/api/emergency', require('./routes/emergency')); // Emergency endpoints
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
