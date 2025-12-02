@@ -66,24 +66,25 @@ sequelize.authenticate()
           const { User } = require('./models');
           const bcrypt = require('bcryptjs');
           
-          // Create or update admin user
-          const adminPassword = await bcrypt.hash('admin123', 10);
+          // Create or update admin user - force password update
           const [adminUser, adminCreated] = await User.findOrCreate({
             where: { email: 'admin@clinic.com' },
             defaults: {
               firstName: 'Admin',
               lastName: 'User',
               email: 'admin@clinic.com',
-              password: adminPassword,
+              password: 'admin123', // Will be hashed by beforeCreate hook
               role: 'admin',
               phone: '1234567890',
               isActive: true
             }
           });
           
-          // Update password and ensure user is active
+          // Force update password and ensure user is active
           if (!adminCreated) {
-            adminUser.password = adminPassword;
+            // Use set and mark as changed to trigger beforeUpdate hook
+            adminUser.set('password', 'admin123');
+            adminUser.changed('password', true);
             adminUser.isActive = true;
             await adminUser.save();
             console.log('Admin user updated: admin@clinic.com / admin123');
@@ -92,14 +93,13 @@ sequelize.authenticate()
           }
           
           // Create or update doctor user
-          const doctorPassword = await bcrypt.hash('doctor123', 10);
           const [doctorUser, doctorCreated] = await User.findOrCreate({
             where: { email: 'doctor@clinic.com' },
             defaults: {
               firstName: 'John',
               lastName: 'Doctor',
               email: 'doctor@clinic.com',
-              password: doctorPassword,
+              password: 'doctor123', // Will be hashed by beforeCreate hook
               role: 'doctor',
               specialization: 'Ophthalmology',
               licenseNumber: 'DOC12345',
@@ -109,7 +109,8 @@ sequelize.authenticate()
           });
           
           if (!doctorCreated) {
-            doctorUser.password = doctorPassword;
+            doctorUser.set('password', 'doctor123');
+            doctorUser.changed('password', true);
             doctorUser.isActive = true;
             await doctorUser.save();
             console.log('Doctor user updated: doctor@clinic.com / doctor123');
@@ -118,14 +119,13 @@ sequelize.authenticate()
           }
           
           // Create or update receptionist user
-          const receptionistPassword = await bcrypt.hash('receptionist123', 10);
           const [receptionistUser, receptionistCreated] = await User.findOrCreate({
             where: { email: 'receptionist@clinic.com' },
             defaults: {
               firstName: 'Jane',
               lastName: 'Receptionist',
               email: 'receptionist@clinic.com',
-              password: receptionistPassword,
+              password: 'receptionist123', // Will be hashed by beforeCreate hook
               role: 'receptionist',
               phone: '1234567892',
               isActive: true
@@ -133,7 +133,8 @@ sequelize.authenticate()
           });
           
           if (!receptionistCreated) {
-            receptionistUser.password = receptionistPassword;
+            receptionistUser.set('password', 'receptionist123');
+            receptionistUser.changed('password', true);
             receptionistUser.isActive = true;
             await receptionistUser.save();
             console.log('Receptionist user updated: receptionist@clinic.com / receptionist123');
