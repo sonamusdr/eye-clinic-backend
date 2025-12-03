@@ -387,126 +387,170 @@ IMPORTANTE: Si la pregunta requiere buscar información específica (nombres de 
 const detectIntent = (message) => {
   const lowerMessage = message.toLowerCase().trim();
   
-  // Patient queries - enhanced
-  if (lowerMessage.match(/\b(paciente|patient|cliente|client)\b/)) {
+  // Log for debugging
+  console.log('🔍 Detecting intent for message:', message);
+  
+  // Patient queries - enhanced with more patterns
+  if (lowerMessage.match(/\b(paciente|patient|cliente|client|pacientes|patients)\b/)) {
     // Check for specific patient name search
-    const nameMatch = lowerMessage.match(/(?:paciente|patient|cliente|client|buscar|search|find)\s+([a-záéíóúñ\s]+)/i);
+    const nameMatch = lowerMessage.match(/(?:paciente|patient|cliente|client|buscar|search|find|busca)\s+([a-záéíóúñ\s]+)/i);
     if (nameMatch && nameMatch[1].trim().length > 2) {
+      console.log('✅ Intent detected: patient_search');
       return { type: 'patient_search', name: nameMatch[1].trim() };
     }
     
-    if (lowerMessage.match(/\b(cuánto|how many|total|cuántos|cuántas)\b/)) {
+    if (lowerMessage.match(/\b(cuánto|how many|total|cuántos|cuántas|hay|tengo|tenemos)\b/)) {
+      console.log('✅ Intent detected: patient_count');
       return { type: 'patient_count' };
     }
-    if (lowerMessage.match(/\b(hoy|today|hoy día)\b/)) {
+    if (lowerMessage.match(/\b(hoy|today|hoy día|este día)\b/)) {
+      console.log('✅ Intent detected: patient_today');
       return { type: 'patient_today' };
     }
-    if (lowerMessage.match(/\b(mes|month|este mes|this month)\b/)) {
+    if (lowerMessage.match(/\b(mes|month|este mes|this month|del mes)\b/)) {
+      console.log('✅ Intent detected: patient_month');
       return { type: 'patient_month' };
     }
-    if (lowerMessage.match(/\b(semana|week|esta semana|this week)\b/)) {
+    if (lowerMessage.match(/\b(semana|week|esta semana|this week|de la semana)\b/)) {
+      console.log('✅ Intent detected: patient_week');
       return { type: 'patient_week' };
     }
+    console.log('✅ Intent detected: patient_info');
     return { type: 'patient_info' };
   }
 
-  // Appointment queries - enhanced
-  if (lowerMessage.match(/\b(cita|appointment|consulta|visita)\b/)) {
-    if (lowerMessage.match(/\b(cuánto|how many|total|cuántos|cuántas)\b/)) {
+  // Appointment queries - enhanced with more patterns
+  if (lowerMessage.match(/\b(cita|appointment|consulta|visita|citas|appointments|consultas)\b/)) {
+    if (lowerMessage.match(/\b(cuánto|how many|total|cuántos|cuántas|hay|tengo|tenemos)\b/)) {
+      console.log('✅ Intent detected: appointment_count');
       return { type: 'appointment_count' };
     }
-    if (lowerMessage.match(/\b(hoy|today|hoy día)\b/)) {
+    if (lowerMessage.match(/\b(hoy|today|hoy día|este día|de hoy)\b/)) {
+      console.log('✅ Intent detected: appointment_today');
       return { type: 'appointment_today' };
     }
-    if (lowerMessage.match(/\b(próxima|upcoming|siguiente|next|mañana|tomorrow)\b/)) {
+    if (lowerMessage.match(/\b(próxima|upcoming|siguiente|next|mañana|tomorrow|próximas|siguientes)\b/)) {
       const daysMatch = lowerMessage.match(/(\d+)\s*(día|day|días|days)/);
       const days = daysMatch ? parseInt(daysMatch[1]) : 7;
+      console.log('✅ Intent detected: appointment_upcoming');
       return { type: 'appointment_upcoming', days };
     }
-    if (lowerMessage.match(/\b(programada|scheduled|agendada)\b/)) {
+    if (lowerMessage.match(/\b(programada|scheduled|agendada|programadas)\b/)) {
+      console.log('✅ Intent detected: appointment_scheduled');
       return { type: 'appointment_scheduled' };
     }
-    if (lowerMessage.match(/\b(completada|completed|finalizada)\b/)) {
+    if (lowerMessage.match(/\b(completada|completed|finalizada|completadas)\b/)) {
+      console.log('✅ Intent detected: appointment_completed');
       return { type: 'appointment_completed' };
     }
-    if (lowerMessage.match(/\b(cancelada|cancelled|cancelada)\b/)) {
+    if (lowerMessage.match(/\b(cancelada|cancelled|canceladas)\b/)) {
+      console.log('✅ Intent detected: appointment_cancelled');
       return { type: 'appointment_cancelled' };
     }
-    if (lowerMessage.match(/\b(semana|week|esta semana|this week)\b/)) {
+    if (lowerMessage.match(/\b(semana|week|esta semana|this week|de la semana)\b/)) {
+      console.log('✅ Intent detected: appointment_week');
       return { type: 'appointment_week' };
     }
-    if (lowerMessage.match(/\b(mes|month|este mes|this month)\b/)) {
+    if (lowerMessage.match(/\b(mes|month|este mes|this month|del mes)\b/)) {
+      console.log('✅ Intent detected: appointment_month');
       return { type: 'appointment_month' };
     }
     // Check for doctor name in appointment query
-    const doctorMatch = lowerMessage.match(/(?:doctor|dr\.?|doctora)\s+([a-záéíóúñ\s]+)/i);
+    const doctorMatch = lowerMessage.match(/(?:doctor|dr\.?|doctora|del doctor|del dr)\s+([a-záéíóúñ\s]+)/i);
     if (doctorMatch && doctorMatch[1].trim().length > 2) {
+      console.log('✅ Intent detected: appointment_doctor');
       return { type: 'appointment_doctor', doctorName: doctorMatch[1].trim() };
     }
+    console.log('✅ Intent detected: appointment_info');
     return { type: 'appointment_info' };
   }
 
-  // Inventory queries - enhanced
-  if (lowerMessage.match(/\b(inventario|inventory|insumo|stock|artículo|item|producto)\b/)) {
-    if (lowerMessage.match(/\b(bajo|low|falt|missing|poco|escaso)\b/)) {
+  // Inventory queries - enhanced with more patterns
+  if (lowerMessage.match(/\b(inventario|inventory|insumo|stock|artículo|item|producto|artículos|productos|insumos)\b/)) {
+    if (lowerMessage.match(/\b(bajo|low|falt|missing|poco|escaso|bajos|faltan|faltantes)\b/)) {
+      console.log('✅ Intent detected: inventory_low');
       return { type: 'inventory_low' };
     }
-    if (lowerMessage.match(/\b(agotado|out of stock|sin stock|sin existencias|cero)\b/)) {
+    if (lowerMessage.match(/\b(agotado|out of stock|sin stock|sin existencias|cero|agotados)\b/)) {
+      console.log('✅ Intent detected: inventory_out');
       return { type: 'inventory_out' };
     }
-    if (lowerMessage.match(/\b(cuánto|how many|total|valor|value)\b/)) {
+    if (lowerMessage.match(/\b(cuánto|how many|total|valor|value|hay|tengo|tenemos)\b/)) {
+      console.log('✅ Intent detected: inventory_value');
       return { type: 'inventory_value' };
     }
+    console.log('✅ Intent detected: inventory_info');
     return { type: 'inventory_info' };
   }
 
-  // Financial queries - enhanced
-  if (lowerMessage.match(/\b(factura|invoice|ingreso|revenue|pago|payment|dinero|money|financiero|financial)\b/)) {
-    if (lowerMessage.match(/\b(pendiente|pending|por pagar)\b/)) {
+  // Financial queries - enhanced with more patterns
+  if (lowerMessage.match(/\b(factura|invoice|ingreso|revenue|pago|payment|dinero|money|financiero|financial|facturas|ingresos|pagos)\b/)) {
+    if (lowerMessage.match(/\b(pendiente|pending|por pagar|pendientes)\b/)) {
+      console.log('✅ Intent detected: financial_pending');
       return { type: 'financial_pending' };
     }
-    if (lowerMessage.match(/\b(hoy|today|hoy día)\b/)) {
+    if (lowerMessage.match(/\b(hoy|today|hoy día|de hoy|este día)\b/)) {
+      console.log('✅ Intent detected: financial_today');
       return { type: 'financial_today' };
     }
-    if (lowerMessage.match(/\b(semana|week|esta semana|this week)\b/)) {
+    if (lowerMessage.match(/\b(semana|week|esta semana|this week|de la semana)\b/)) {
+      console.log('✅ Intent detected: financial_week');
       return { type: 'financial_week' };
     }
-    if (lowerMessage.match(/\b(mes|month|este mes|this month)\b/)) {
+    if (lowerMessage.match(/\b(mes|month|este mes|this month|del mes)\b/)) {
+      console.log('✅ Intent detected: financial_month');
       return { type: 'financial_month' };
     }
-    if (lowerMessage.match(/\b(total|general|overall)\b/)) {
+    if (lowerMessage.match(/\b(total|general|overall|totales)\b/)) {
+      console.log('✅ Intent detected: financial_info');
       return { type: 'financial_info' };
     }
+    console.log('✅ Intent detected: financial_info');
     return { type: 'financial_info' };
   }
 
-  // Staff queries - enhanced
-  if (lowerMessage.match(/\b(personal|staff|doctor|empleado|employee|trabajador|worker)\b/)) {
-    if (lowerMessage.match(/\b(cuánto|how many|total|cuántos|cuántas)\b/)) {
+  // Staff queries - enhanced with more patterns
+  if (lowerMessage.match(/\b(personal|staff|doctor|empleado|employee|trabajador|worker|doctores|empleados)\b/)) {
+    if (lowerMessage.match(/\b(cuánto|how many|total|cuántos|cuántas|hay|tengo|tenemos)\b/)) {
+      console.log('✅ Intent detected: staff_count');
       return { type: 'staff_count' };
     }
+    console.log('✅ Intent detected: staff_info');
     return { type: 'staff_info' };
   }
 
-  // Medical records queries
-  if (lowerMessage.match(/\b(expediente|medical record|historial|record|registro médico)\b/)) {
-    if (lowerMessage.match(/\b(cuánto|how many|total|cuántos|cuántas)\b/)) {
+  // Medical records queries - enhanced
+  if (lowerMessage.match(/\b(expediente|medical record|historial|record|registro médico|expedientes|historiales)\b/)) {
+    if (lowerMessage.match(/\b(cuánto|how many|total|cuántos|cuántas|hay|tengo|tenemos)\b/)) {
+      console.log('✅ Intent detected: medical_records_count');
       return { type: 'medical_records_count' };
     }
-    if (lowerMessage.match(/\b(mes|month|este mes|this month)\b/)) {
+    if (lowerMessage.match(/\b(mes|month|este mes|this month|del mes)\b/)) {
+      console.log('✅ Intent detected: medical_records_month');
       return { type: 'medical_records_month' };
     }
+    console.log('✅ Intent detected: medical_records_info');
     return { type: 'medical_records_info' };
   }
 
-  // Greeting and help
-  if (lowerMessage.match(/\b(hola|hello|hi|buenos días|buenas tardes|buenas noches)\b/)) {
+  // Greeting and help - enhanced
+  if (lowerMessage.match(/\b(hola|hello|hi|buenos días|buenas tardes|buenas noches|saludos)\b/)) {
+    console.log('✅ Intent detected: greeting');
     return { type: 'greeting' };
   }
-  if (lowerMessage.match(/\b(ayuda|help|qué puedo|what can|qué puedes|what do you)\b/)) {
+  if (lowerMessage.match(/\b(ayuda|help|qué puedo|what can|qué puedes|what do you|qué puedes hacer|qué sabes)\b/)) {
+    console.log('✅ Intent detected: help');
     return { type: 'help' };
   }
 
+  // Try to detect common question patterns even without keywords
+  if (lowerMessage.match(/\b(cuánto|cuántos|cuántas|how many|total|hay|tengo|tenemos)\b/)) {
+    // If it's a "how many" question but we couldn't categorize it, try to get general stats
+    console.log('✅ Intent detected: general_count (trying to provide useful info)');
+    return { type: 'general_count' };
+  }
+
+  console.log('⚠️  Intent detected: general (no specific intent found)');
   return { type: 'general' };
 };
 
@@ -681,6 +725,17 @@ const generateResponse = async (intent, data, originalMessage) => {
 • Este mes: **${data.thisMonth}**
 • Esta semana: **${data.thisWeek}**`;
 
+    case 'general_count':
+      // Try to provide a general overview when we detect a "how many" question
+      return `📊 **Resumen General del Sistema:**
+• Pacientes: Consulta con "¿Cuántos pacientes hay?"
+• Citas: Consulta con "¿Cuántas citas hay?"
+• Personal: Consulta con "¿Cuántos doctores hay?"
+• Inventario: Consulta con "Artículos con stock bajo"
+• Financiero: Consulta con "Ingresos de hoy"
+
+¿Sobre qué sección te gustaría saber más?`;
+
     default:
       return 'Puedo ayudarte con información sobre pacientes, citas, inventario, facturación, personal y expedientes médicos. ¿Qué te gustaría saber? Intenta preguntar de forma más específica, por ejemplo: "¿Cuántos pacientes hay?" o "Buscar paciente Juan".';
   }
@@ -789,6 +844,25 @@ exports.chat = async (req, res) => {
         case 'medical_records_info':
           data = await getSystemData.getMedicalRecordsStats();
           response = await generateResponse(intent, data, message);
+          break;
+
+        case 'general_count':
+          // Get all stats for a general overview
+          const [patientStats, appointmentStats, inventoryStats, financialStats, staffStats] = await Promise.all([
+            getSystemData.getPatientStats(),
+            getSystemData.getAppointmentStats(),
+            getSystemData.getInventoryStats(),
+            getSystemData.getFinancialStats(),
+            getSystemData.getStaffStats()
+          ]);
+          response = `📊 **Resumen General del Sistema:**
+• **Pacientes**: ${patientStats.total} totales, ${patientStats.active} activos
+• **Citas**: ${appointmentStats.total} totales, ${appointmentStats.today} hoy
+• **Inventario**: ${inventoryStats.total} artículos, ${inventoryStats.lowStock} con stock bajo
+• **Financiero**: $${financialStats.totalRevenue.toFixed(2)} ingresos totales, ${financialStats.pendingInvoices} facturas pendientes
+• **Personal**: ${staffStats.active} miembros activos (${staffStats.doctors} doctores)
+
+¿Sobre qué sección te gustaría saber más detalles?`;
           break;
 
         default:
