@@ -1,4 +1,4 @@
-const { Patient, MedicalRecord, Appointment, Invoice, Payment, User } = require('../models');
+const { Patient, MedicalRecord, Appointment, Invoice, Payment, User, Inventory } = require('../models');
 const { Op } = require('sequelize');
 const moment = require('moment');
 
@@ -223,6 +223,139 @@ exports.getAppointmentStats = async (req, res) => {
     res.json({
       success: true,
       stats
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get all patients report
+exports.getPatientsReport = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    const where = {};
+    if (startDate && endDate) {
+      where.createdAt = {
+        [Op.between]: [startDate, endDate]
+      };
+    }
+
+    const patients = await Patient.findAll({
+      where,
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.json({
+      success: true,
+      report: {
+        period: { startDate, endDate },
+        total: patients.length,
+        patients
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get all staff report
+exports.getStaffReport = async (req, res) => {
+  try {
+    const { role } = req.query;
+
+    const where = { isActive: true };
+    if (role) {
+      where.role = role;
+    }
+
+    const staff = await User.findAll({
+      where,
+      attributes: { exclude: ['password'] },
+      order: [['lastName', 'ASC']]
+    });
+
+    res.json({
+      success: true,
+      report: {
+        total: staff.length,
+        staff
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get inventory report
+exports.getInventoryReport = async (req, res) => {
+  try {
+    const { lowStockOnly } = req.query;
+
+    let items;
+    if (lowStockOnly === 'true') {
+      // Get all items and filter in memory for low stock
+      items = await Inventory.findAll({
+        order: [['itemName', 'ASC']]
+      });
+      items = items.filter(item => parseFloat(item.quantity || 0) <= parseFloat(item.reorderLevel || 0));
+    } else {
+      items = await Inventory.findAll({
+        order: [['itemName', 'ASC']]
+      });
+    }
+
+    const totalValue = items.reduce((sum, item) => {
+      return sum + (parseFloat(item.quantity || 0) * parseFloat(item.unitPrice || 0));
+    }, 0);
+
+    res.json({
+      success: true,
+      report: {
+        total: items.length,
+        totalValue,
+        items
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get appointments report
+exports.getAppointmentsReport = async (req, res) => {
+  try {
+    const { startDate, endDate, status, doctorId } = req.query;
+
+    const where = {};
+    if (startDate && endDate) {
+      where.appointmentDate = {
+        [Op.between]: [startDate, endDate]
+      };
+    }
+    if (status) {
+      where.status = status;
+    }
+    if (doctorId) {
+      where.doctorId = doctorId;
+    }
+
+    const appointments = await Appointment.findAll({
+      where,
+      include: [
+        { model: Patient, attributes: ['firstName', 'lastName', 'phone', 'email'] },
+        { model: User, as: 'doctor', attributes: ['firstName', 'lastName', 'specialization'] }
+      ],
+      order: [['appointmentDate', 'DESC'], ['startTime', 'ASC']]
+    });
+
+    res.json({
+      success: true,
+      report: {
+        period: { startDate, endDate },
+        total: appointments.length,
+        appointments
+      }
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

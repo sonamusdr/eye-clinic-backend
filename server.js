@@ -8,6 +8,31 @@ const userHealthCheck = require('./middleware/userHealthCheck');
 // Load environment variables
 dotenv.config();
 
+// Log OpenAI configuration status on startup (for debugging)
+console.log('\n=== AI Configuration Check ===');
+if (process.env.OPENAI_API_KEY) {
+  const keyLength = process.env.OPENAI_API_KEY.length;
+  const keyPrefix = process.env.OPENAI_API_KEY.substring(0, 7);
+  console.log('✅ OpenAI API key detected in environment variables');
+  console.log(`   Key prefix: ${keyPrefix}... (length: ${keyLength})`);
+  console.log(`   Model: ${process.env.OPENAI_MODEL || 'gpt-3.5-turbo'}`);
+  
+  // Try to initialize OpenAI to verify it works
+  try {
+    const OpenAI = require('openai');
+    const testClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    });
+    console.log('✅ OpenAI client initialized successfully');
+  } catch (error) {
+    console.error('❌ OpenAI initialization failed:', error.message);
+  }
+} else {
+  console.log('ℹ️  OpenAI API key not found - chatbot will use rule-based system');
+  console.log('   To enable AI: Set OPENAI_API_KEY in Railway environment variables');
+}
+console.log('================================\n');
+
 const app = express();
 
 // Middleware - CORS configuration
@@ -209,6 +234,23 @@ sequelize.authenticate()
     try {
       const { User: UserModel } = require('./models');
       const bcrypt = require('bcryptjs');
+      
+      // Define critical users for final verification
+      const criticalUsers = [
+        {
+          email: 'admin@clinic.com',
+          password: 'admin123'
+        },
+        {
+          email: 'doctor@clinic.com',
+          password: 'doctor123'
+        },
+        {
+          email: 'receptionist@clinic.com',
+          password: 'receptionist123'
+        }
+      ];
+      
       for (const userData of criticalUsers) {
         try {
           const hashedPassword = await bcrypt.hash(userData.password, 10);
