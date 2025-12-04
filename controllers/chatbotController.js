@@ -399,7 +399,7 @@ const getSystemData = {
   }
 };
 
-// AI-powered intent detection and response generation
+// AI-powered conversational chatbot
 const useAIForChat = async (message, conversationHistory = []) => {
   if (!openaiClient) {
     return null; // Fall back to rule-based if AI not available
@@ -409,37 +409,60 @@ const useAIForChat = async (message, conversationHistory = []) => {
     // Get current system context
     const systemContext = await getSystemData.getAllSystemContext();
     
-    // Build conversation history for context
+    // Build comprehensive system prompt
+    const systemPrompt = `Eres un asistente virtual inteligente y conversacional para una clínica oftalmológica llamada "Bethesda Eye Clinic". Tu personalidad es amigable, profesional, y muy útil.
+
+CONTEXTO DEL SISTEMA (datos actuales en tiempo real):
+📊 **Estadísticas del Sistema:**
+- **Pacientes**: ${systemContext.patients.total} totales, ${systemContext.patients.active} activos, ${systemContext.patients.today} registrados hoy
+- **Citas**: ${systemContext.appointments.total} totales, ${systemContext.appointments.today} hoy, ${systemContext.appointments.scheduled} programadas
+- **Inventario**: ${systemContext.inventory.total} artículos, ${systemContext.inventory.lowStock} con stock bajo, valor total $${systemContext.inventory.totalValue.toFixed(2)}
+- **Financiero**: $${systemContext.financial.totalRevenue.toFixed(2)} ingresos totales, ${systemContext.financial.pendingInvoices} facturas pendientes por $${systemContext.financial.pendingAmount.toFixed(2)}
+- **Personal**: ${systemContext.staff.active} miembros activos (${systemContext.staff.doctors} doctores, ${systemContext.staff.receptionists} recepcionistas, ${systemContext.staff.technicians} técnicos)
+- **Expedientes médicos**: ${systemContext.medicalRecords.total} totales, ${systemContext.medicalRecords.thisMonth} este mes
+- **Procedimientos**: ${systemContext.procedures.total} totales, ${systemContext.procedures.scheduled} programados, ${systemContext.procedures.completed} completados, ${systemContext.procedures.today} hoy
+- **Horarios de Terapia**: ${systemContext.therapySchedules.total} totales, ${systemContext.therapySchedules.active} activos
+- **Resultados de Estudios**: ${systemContext.studyResults.total} totales, ${systemContext.studyResults.pending} pendientes, ${systemContext.studyResults.thisMonth} este mes
+- **Certificaciones Médicas**: ${systemContext.certificates.total} totales, ${systemContext.certificates.active} activas, ${systemContext.certificates.expired} vencidas
+- **Autorizaciones de Seguro**: ${systemContext.insuranceAuthorizations.total} totales, ${systemContext.insuranceAuthorizations.pending} pendientes, ${systemContext.insuranceAuthorizations.approved} aprobadas
+
+INFORMACIÓN DE LA CLÍNICA:
+- **Nombre**: Bethesda Eye Clinic
+- **Dirección**: Tetelo Vargas 26, Torre Profesional Corazones Unidos, Santo Domingo, República Dominicana
+- **Teléfono**: 809.368.3824
+- **WhatsApp**: 829-707-6533
+- **Email**: info@bethesdaeyeclinic.com
+- **Servicios**: Oftalmología General, Consulta Neuro-Oftalmológica, Diagnóstico, Procedimientos Quirúrgicos, Óptica
+
+INSTRUCCIONES IMPORTANTES:
+1. **Sé conversacional y natural**: Responde como si fueras un asistente humano real, no un robot. Mantén conversaciones fluidas y naturales.
+2. **Usa el contexto**: Cuando el usuario pregunte sobre estadísticas, usa los datos del contexto proporcionado arriba.
+3. **Mantén el contexto de la conversación**: Si el usuario hace seguimiento a una pregunta anterior, recuerda el contexto y responde apropiadamente.
+4. **Sé proactivo**: Si el usuario pregunta algo general, ofrece información relevante y útil.
+5. **Formato**: Usa emojis apropiados (📊, 👥, 📅, etc.) y negritas (**texto**) para hacer las respuestas más legibles y amigables.
+6. **Lenguaje natural**: Responde en español de forma natural, como hablarías con un colega. No uses frases robóticas como "Puedo ayudarte con...". En su lugar, responde directamente y de forma conversacional.
+7. **Búsquedas específicas**: Si el usuario pregunta por un paciente, cita o dato específico que no está en el contexto, explica que necesitarías hacer una búsqueda más detallada en el sistema.
+8. **Sé útil y completo**: Si puedes proporcionar información adicional relevante, hazlo. No solo respondas lo mínimo necesario.
+
+EJEMPLOS DE CONVERSACIÓN NATURAL:
+- Usuario: "Hola"
+- Tú: "¡Hola! 👋 ¿En qué puedo ayudarte hoy? ¿Necesitas información sobre pacientes, citas, o alguna otra sección del sistema?"
+  
+- Usuario: "¿Cuántos pacientes hay?"
+- Tú: "Actualmente tenemos **${systemContext.patients.total}** pacientes registrados en el sistema, de los cuales **${systemContext.patients.active}** están activos. ¿Te gustaría saber algo más específico sobre los pacientes?"
+
+- Usuario: "¿Y cuántas citas hay hoy?"
+- Tú: "Hoy tenemos **${systemContext.appointments.today}** citas programadas. También hay **${systemContext.appointments.scheduled}** citas programadas en total en el sistema. ¿Quieres que te dé más detalles sobre las citas de hoy?"
+
+Recuerda: Sé natural, conversacional y útil. Mantén el flujo de la conversación.`;
+
+    // Build conversation history - include more messages for better context
     const messages = [
       {
         role: 'system',
-        content: `Eres un asistente virtual inteligente para una clínica oftalmológica. Tu función es ayudar al personal con información sobre el sistema.
-
-CONTEXTO DEL SISTEMA (datos actuales):
-- Pacientes: Total ${systemContext.patients.total}, activos ${systemContext.patients.active}, hoy ${systemContext.patients.today}
-- Citas: Total ${systemContext.appointments.total}, hoy ${systemContext.appointments.today}, programadas ${systemContext.appointments.scheduled}
-- Inventario: Total ${systemContext.inventory.total} artículos, ${systemContext.inventory.lowStock} con stock bajo, valor total $${systemContext.inventory.totalValue.toFixed(2)}
-- Financiero: Ingresos totales $${systemContext.financial.totalRevenue.toFixed(2)}, facturas pendientes ${systemContext.financial.pendingInvoices} por $${systemContext.financial.pendingAmount.toFixed(2)}
-- Personal: ${systemContext.staff.active} miembros activos (${systemContext.staff.doctors} doctores, ${systemContext.staff.receptionists} recepcionistas, ${systemContext.staff.technicians} técnicos)
-- Expedientes médicos: Total ${systemContext.medicalRecords.total}, este mes ${systemContext.medicalRecords.thisMonth}
-- Procedimientos: Total ${systemContext.procedures.total}, programados ${systemContext.procedures.scheduled}, completados ${systemContext.procedures.completed}, hoy ${systemContext.procedures.today}
-- Horarios de Terapia: Total ${systemContext.therapySchedules.total}, activos ${systemContext.therapySchedules.active}
-- Resultados de Estudios: Total ${systemContext.studyResults.total}, pendientes ${systemContext.studyResults.pending}, este mes ${systemContext.studyResults.thisMonth}
-- Certificaciones Médicas: Total ${systemContext.certificates.total}, activas ${systemContext.certificates.active}, vencidas ${systemContext.certificates.expired}, este mes ${systemContext.certificates.thisMonth}
-- Autorizaciones de Seguro: Total ${systemContext.insuranceAuthorizations.total}, pendientes ${systemContext.insuranceAuthorizations.pending}, aprobadas ${systemContext.insuranceAuthorizations.approved}
-
-CAPACIDADES:
-1. Puedes responder preguntas sobre estadísticas del sistema usando los datos del contexto
-2. Para búsquedas específicas (ej: "buscar paciente Juan"), debes indicar que necesitas consultar la base de datos
-3. Responde de forma natural, amigable y profesional en español
-4. Si no tienes la información exacta, sé honesto y sugiere cómo obtenerla
-5. Usa emojis apropiados para hacer las respuestas más amigables
-6. Formatea las respuestas con negritas (**texto**) para destacar información importante
-7. Si la pregunta requiere datos específicos que no están en el contexto, indica que necesitas hacer una consulta más específica
-
-IMPORTANTE: Si la pregunta requiere buscar información específica (nombres de pacientes, detalles de citas, etc.), responde indicando que necesitas hacer una consulta más detallada a la base de datos.`
+        content: systemPrompt
       },
-      ...conversationHistory.slice(-6), // Last 6 messages for context
+      ...conversationHistory.slice(-10), // Last 10 messages for better context
       {
         role: 'user',
         content: message
@@ -449,14 +472,19 @@ IMPORTANTE: Si la pregunta requiere buscar información específica (nombres de 
     const completion = await openaiClient.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
       messages: messages,
-      temperature: 0.7,
-      max_tokens: 500,
-      top_p: 1,
-      frequency_penalty: 0,
-      presence_penalty: 0
+      temperature: 0.8, // Increased for more natural, conversational responses
+      max_tokens: 800, // Increased for longer, more detailed responses
+      top_p: 0.9,
+      frequency_penalty: 0.3, // Slight penalty to avoid repetition
+      presence_penalty: 0.3 // Encourages talking about new topics
     });
 
-    return completion.choices[0].message.content;
+    const aiResponse = completion.choices[0].message.content;
+    
+    // Log for debugging
+    console.log('🤖 AI Response generated:', aiResponse.substring(0, 100) + '...');
+    
+    return aiResponse;
   } catch (error) {
     console.error('OpenAI API error:', error);
     return null; // Fall back to rule-based
@@ -1014,7 +1042,7 @@ exports.chat = async (req, res) => {
       return res.status(400).json({ message: 'El mensaje no puede estar vacío' });
     }
 
-    // Try AI first if available
+    // Always try AI first if available (prioritize conversational AI)
     let aiResponse = null;
     if (openaiClient) {
       try {
@@ -1024,8 +1052,8 @@ exports.chat = async (req, res) => {
       }
     }
 
-    // If AI provided a good response, use it
-    if (aiResponse && aiResponse.length > 10) {
+    // If AI provided a response, use it (even if short, AI is more conversational)
+    if (aiResponse && aiResponse.trim().length > 0) {
       return res.json({
         success: true,
         response: aiResponse,
@@ -1034,7 +1062,7 @@ exports.chat = async (req, res) => {
       });
     }
 
-    // Otherwise, use rule-based system
+    // Fallback to rule-based system only if AI is not available or failed
     const intent = detectIntent(message);
     let data = {};
     let response = '';
