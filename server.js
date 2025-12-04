@@ -67,6 +67,11 @@ app.use('/api/patient-forms', require('./routes/patientForms'));
 app.use('/api/appointment-links', require('./routes/appointmentLinks'));
 app.use('/api/chatbot', require('./routes/chatbot'));
 app.use('/api/emergency', require('./routes/emergency')); // Emergency endpoints
+app.use('/api/procedures', require('./routes/procedures'));
+app.use('/api/therapy-schedules', require('./routes/therapySchedules'));
+app.use('/api/study-results', require('./routes/studyResults'));
+app.use('/api/medical-certificates', require('./routes/medicalCertificates'));
+app.use('/api/insurance-authorizations', require('./routes/insuranceAuthorizations'));
 
 // Health check endpoint with user verification
 app.get('/api/health', async (req, res) => {

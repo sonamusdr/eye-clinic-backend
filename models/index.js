@@ -11,6 +11,11 @@ const AuditLog = require('./AuditLog');
 const Notification = require('./Notification');
 const PatientForm = require('./PatientForm');
 const AppointmentLink = require('./AppointmentLink');
+const Procedure = require('./Procedure');
+const TherapySchedule = require('./TherapySchedule');
+const StudyResult = require('./StudyResult');
+const MedicalCertificate = require('./MedicalCertificate');
+const InsuranceAuthorization = require('./InsuranceAuthorization');
 
 // Define associations
 User.hasMany(Appointment, { foreignKey: 'doctorId', as: 'doctorAppointments' });
@@ -46,6 +51,31 @@ PatientForm.belongsTo(Patient, { foreignKey: 'patientId', as: 'Patient' });
 User.hasMany(AppointmentLink, { foreignKey: 'doctorId', as: 'appointmentLinks' });
 AppointmentLink.belongsTo(User, { foreignKey: 'doctorId', as: 'doctor' });
 
+// Procedure associations
+Patient.hasMany(Procedure, { foreignKey: 'patientId' });
+Procedure.belongsTo(Patient, { foreignKey: 'patientId' });
+Procedure.belongsTo(User, { foreignKey: 'doctorId', as: 'doctor' });
+
+// TherapySchedule associations
+Patient.hasMany(TherapySchedule, { foreignKey: 'patientId' });
+TherapySchedule.belongsTo(Patient, { foreignKey: 'patientId' });
+TherapySchedule.belongsTo(User, { foreignKey: 'doctorId', as: 'doctor' });
+
+// StudyResult associations
+Patient.hasMany(StudyResult, { foreignKey: 'patientId' });
+StudyResult.belongsTo(Patient, { foreignKey: 'patientId' });
+StudyResult.belongsTo(User, { foreignKey: 'doctorId', as: 'doctor' });
+
+// MedicalCertificate associations
+Patient.hasMany(MedicalCertificate, { foreignKey: 'patientId' });
+MedicalCertificate.belongsTo(Patient, { foreignKey: 'patientId' });
+MedicalCertificate.belongsTo(User, { foreignKey: 'doctorId', as: 'doctor' });
+
+// InsuranceAuthorization associations
+Patient.hasMany(InsuranceAuthorization, { foreignKey: 'patientId' });
+InsuranceAuthorization.belongsTo(Patient, { foreignKey: 'patientId' });
+InsuranceAuthorization.belongsTo(User, { foreignKey: 'doctorId', as: 'doctor' });
+
 module.exports = {
   sequelize,
   User,
@@ -59,6 +89,11 @@ module.exports = {
   AuditLog,
   Notification,
   PatientForm,
-  AppointmentLink
+  AppointmentLink,
+  Procedure,
+  TherapySchedule,
+  StudyResult,
+  MedicalCertificate,
+  InsuranceAuthorization
 };
 
