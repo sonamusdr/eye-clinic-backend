@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   createAppointment,
+  createPublicAppointment,
   getAppointments,
   getAppointmentById,
   updateAppointment,
@@ -10,6 +11,9 @@ const {
   getDoctorSchedule
 } = require('../controllers/appointmentController');
 const { authenticate, authorize } = require('../middleware/auth');
+
+// Public endpoint for website appointments (no authentication required)
+router.post('/public', createPublicAppointment);
 
 router.post('/', authenticate, authorize('admin', 'receptionist', 'doctor'), createAppointment);
 router.get('/', authenticate, getAppointments);
