@@ -234,6 +234,32 @@ sequelize.authenticate()
       }
     }
     
+    // Create new tables for additional sections (only creates if they don't exist)
+    try {
+      console.log('Ensuring new section tables exist...');
+      const { Procedure, TherapySchedule, StudyResult, MedicalCertificate, InsuranceAuthorization } = require('./models');
+      
+      await Procedure.sync({ alter: false });
+      console.log('✅ Procedures table ready');
+      
+      await TherapySchedule.sync({ alter: false });
+      console.log('✅ Therapy schedules table ready');
+      
+      await StudyResult.sync({ alter: false });
+      console.log('✅ Study results table ready');
+      
+      await MedicalCertificate.sync({ alter: false });
+      console.log('✅ Medical certificates table ready');
+      
+      await InsuranceAuthorization.sync({ alter: false });
+      console.log('✅ Insurance authorizations table ready');
+      
+      console.log('All new section tables verified/created.');
+    } catch (tableError) {
+      console.error('Error creating new tables:', tableError);
+      // Don't exit - server can still run
+    }
+    
     // Final check: Ensure users are active one more time after any sync
     console.log('Final verification of critical users...');
     try {
