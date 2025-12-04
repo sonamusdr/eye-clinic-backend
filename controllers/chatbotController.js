@@ -1,4 +1,4 @@
-const { Patient, Appointment, Inventory, Invoice, Payment, User, MedicalRecord, sequelize } = require('../models');
+const { Patient, Appointment, Inventory, Invoice, Payment, User, MedicalRecord, Procedure, TherapySchedule, StudyResult, MedicalCertificate, InsuranceAuthorization, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const moment = require('moment');
 
@@ -179,6 +179,71 @@ const getSystemData = {
     return { total, active, doctors, receptionists, technicians, admins };
   },
 
+  // Procedure statistics
+  async getProcedureStats() {
+    const total = await Procedure.count();
+    const scheduled = await Procedure.count({ where: { status: 'scheduled' } });
+    const inProgress = await Procedure.count({ where: { status: 'in_progress' } });
+    const completed = await Procedure.count({ where: { status: 'completed' } });
+    const cancelled = await Procedure.count({ where: { status: 'cancelled' } });
+    const today = await Procedure.count({
+      where: {
+        procedureDate: moment().format('YYYY-MM-DD')
+      }
+    });
+    return { total, scheduled, inProgress, completed, cancelled, today };
+  },
+
+  // Therapy Schedule statistics
+  async getTherapyStats() {
+    const total = await TherapySchedule.count();
+    const active = await TherapySchedule.count({ where: { status: 'active' } });
+    const completed = await TherapySchedule.count({ where: { status: 'completed' } });
+    const cancelled = await TherapySchedule.count({ where: { status: 'cancelled' } });
+    return { total, active, completed, cancelled };
+  },
+
+  // Study Result statistics
+  async getStudyResultStats() {
+    const total = await StudyResult.count();
+    const pending = await StudyResult.count({ where: { status: 'pending' } });
+    const completed = await StudyResult.count({ where: { status: 'completed' } });
+    const reviewed = await StudyResult.count({ where: { status: 'reviewed' } });
+    const thisMonth = await StudyResult.count({
+      where: {
+        studyDate: {
+          [Op.gte]: moment().startOf('month').format('YYYY-MM-DD')
+        }
+      }
+    });
+    return { total, pending, completed, reviewed, thisMonth };
+  },
+
+  // Medical Certificate statistics
+  async getCertificateStats() {
+    const total = await MedicalCertificate.count();
+    const active = await MedicalCertificate.count({ where: { status: 'active' } });
+    const expired = await MedicalCertificate.count({ where: { status: 'expired' } });
+    const thisMonth = await MedicalCertificate.count({
+      where: {
+        issueDate: {
+          [Op.gte]: moment().startOf('month').format('YYYY-MM-DD')
+        }
+      }
+    });
+    return { total, active, expired, thisMonth };
+  },
+
+  // Insurance Authorization statistics
+  async getInsuranceStats() {
+    const total = await InsuranceAuthorization.count();
+    const pending = await InsuranceAuthorization.count({ where: { status: 'pending' } });
+    const approved = await InsuranceAuthorization.count({ where: { status: 'approved' } });
+    const rejected = await InsuranceAuthorization.count({ where: { status: 'rejected' } });
+    const expired = await InsuranceAuthorization.count({ where: { status: 'expired' } });
+    return { total, pending, approved, rejected, expired };
+  },
+
   // Get specific patient info
   async getPatientInfo(name) {
     const patients = await Patient.findAll({
@@ -303,13 +368,18 @@ const getSystemData = {
 
   // Get all relevant system data for AI context
   async getAllSystemContext() {
-    const [patientStats, appointmentStats, inventoryStats, financialStats, staffStats, medicalRecordsStats] = await Promise.all([
+    const [patientStats, appointmentStats, inventoryStats, financialStats, staffStats, medicalRecordsStats, procedureStats, therapyStats, studyResultStats, certificateStats, insuranceStats] = await Promise.all([
       this.getPatientStats(),
       this.getAppointmentStats(),
       this.getInventoryStats(),
       this.getFinancialStats(),
       this.getStaffStats(),
-      this.getMedicalRecordsStats()
+      this.getMedicalRecordsStats(),
+      this.getProcedureStats(),
+      this.getTherapyStats(),
+      this.getStudyResultStats(),
+      this.getCertificateStats(),
+      this.getInsuranceStats()
     ]);
 
     return {
@@ -319,6 +389,11 @@ const getSystemData = {
       financial: financialStats,
       staff: staffStats,
       medicalRecords: medicalRecordsStats,
+      procedures: procedureStats,
+      therapySchedules: therapyStats,
+      studyResults: studyResultStats,
+      certificates: certificateStats,
+      insuranceAuthorizations: insuranceStats,
       timestamp: moment().format('YYYY-MM-DD HH:mm:ss')
     };
   }
@@ -347,6 +422,11 @@ CONTEXTO DEL SISTEMA (datos actuales):
 - Financiero: Ingresos totales $${systemContext.financial.totalRevenue.toFixed(2)}, facturas pendientes ${systemContext.financial.pendingInvoices} por $${systemContext.financial.pendingAmount.toFixed(2)}
 - Personal: ${systemContext.staff.active} miembros activos (${systemContext.staff.doctors} doctores, ${systemContext.staff.receptionists} recepcionistas, ${systemContext.staff.technicians} técnicos)
 - Expedientes médicos: Total ${systemContext.medicalRecords.total}, este mes ${systemContext.medicalRecords.thisMonth}
+- Procedimientos: Total ${systemContext.procedures.total}, programados ${systemContext.procedures.scheduled}, completados ${systemContext.procedures.completed}, hoy ${systemContext.procedures.today}
+- Horarios de Terapia: Total ${systemContext.therapySchedules.total}, activos ${systemContext.therapySchedules.active}
+- Resultados de Estudios: Total ${systemContext.studyResults.total}, pendientes ${systemContext.studyResults.pending}, este mes ${systemContext.studyResults.thisMonth}
+- Certificaciones Médicas: Total ${systemContext.certificates.total}, activas ${systemContext.certificates.active}, vencidas ${systemContext.certificates.expired}, este mes ${systemContext.certificates.thisMonth}
+- Autorizaciones de Seguro: Total ${systemContext.insuranceAuthorizations.total}, pendientes ${systemContext.insuranceAuthorizations.pending}, aprobadas ${systemContext.insuranceAuthorizations.approved}
 
 CAPACIDADES:
 1. Puedes responder preguntas sobre estadísticas del sistema usando los datos del contexto
@@ -531,6 +611,104 @@ const detectIntent = (message) => {
     }
     console.log('✅ Intent detected: medical_records_info');
     return { type: 'medical_records_info' };
+  }
+
+  // Procedure queries
+  if (lowerMessage.match(/\b(procedimiento|procedure|cirugía|surgery|procedimientos|cirugías)\b/)) {
+    if (lowerMessage.match(/\b(cuánto|how many|total|cuántos|cuántas|hay)\b/)) {
+      console.log('✅ Intent detected: procedure_count');
+      return { type: 'procedure_count' };
+    }
+    if (lowerMessage.match(/\b(programado|scheduled|agendado|programados)\b/)) {
+      console.log('✅ Intent detected: procedure_scheduled');
+      return { type: 'procedure_scheduled' };
+    }
+    if (lowerMessage.match(/\b(completado|completed|completados)\b/)) {
+      console.log('✅ Intent detected: procedure_completed');
+      return { type: 'procedure_completed' };
+    }
+    if (lowerMessage.match(/\b(hoy|today|de hoy)\b/)) {
+      console.log('✅ Intent detected: procedure_today');
+      return { type: 'procedure_today' };
+    }
+    console.log('✅ Intent detected: procedure_info');
+    return { type: 'procedure_info' };
+  }
+
+  // Therapy schedule queries
+  if (lowerMessage.match(/\b(terapia|therapy|horario de terapia|therapy schedule|terapias)\b/)) {
+    if (lowerMessage.match(/\b(cuánto|how many|total|cuántos|cuántas|hay)\b/)) {
+      console.log('✅ Intent detected: therapy_count');
+      return { type: 'therapy_count' };
+    }
+    if (lowerMessage.match(/\b(activo|active|activos)\b/)) {
+      console.log('✅ Intent detected: therapy_active');
+      return { type: 'therapy_active' };
+    }
+    console.log('✅ Intent detected: therapy_info');
+    return { type: 'therapy_info' };
+  }
+
+  // Study result queries
+  if (lowerMessage.match(/\b(estudio|study|resultado de estudio|study result|estudios|resultados)\b/)) {
+    if (lowerMessage.match(/\b(cuánto|how many|total|cuántos|cuántas|hay)\b/)) {
+      console.log('✅ Intent detected: study_result_count');
+      return { type: 'study_result_count' };
+    }
+    if (lowerMessage.match(/\b(pendiente|pending|pendientes)\b/)) {
+      console.log('✅ Intent detected: study_result_pending');
+      return { type: 'study_result_pending' };
+    }
+    if (lowerMessage.match(/\b(mes|month|este mes)\b/)) {
+      console.log('✅ Intent detected: study_result_month');
+      return { type: 'study_result_month' };
+    }
+    console.log('✅ Intent detected: study_result_info');
+    return { type: 'study_result_info' };
+  }
+
+  // Medical certificate queries
+  if (lowerMessage.match(/\b(certificado|certificate|certificación|certificados|certificaciones)\b/)) {
+    if (lowerMessage.match(/\b(cuánto|how many|total|cuántos|cuántas|hay)\b/)) {
+      console.log('✅ Intent detected: certificate_count');
+      return { type: 'certificate_count' };
+    }
+    if (lowerMessage.match(/\b(activo|active|activos)\b/)) {
+      console.log('✅ Intent detected: certificate_active');
+      return { type: 'certificate_active' };
+    }
+    if (lowerMessage.match(/\b(vencido|expired|vencidos)\b/)) {
+      console.log('✅ Intent detected: certificate_expired');
+      return { type: 'certificate_expired' };
+    }
+    if (lowerMessage.match(/\b(mes|month|este mes)\b/)) {
+      console.log('✅ Intent detected: certificate_month');
+      return { type: 'certificate_month' };
+    }
+    console.log('✅ Intent detected: certificate_info');
+    return { type: 'certificate_info' };
+  }
+
+  // Insurance authorization queries
+  if (lowerMessage.match(/\b(seguro|insurance|autorización|authorization|autorizaciones|seguros)\b/)) {
+    if (lowerMessage.match(/\b(cuánto|how many|total|cuántos|cuántas|hay)\b/)) {
+      console.log('✅ Intent detected: insurance_count');
+      return { type: 'insurance_count' };
+    }
+    if (lowerMessage.match(/\b(pendiente|pending|pendientes)\b/)) {
+      console.log('✅ Intent detected: insurance_pending');
+      return { type: 'insurance_pending' };
+    }
+    if (lowerMessage.match(/\b(aprobado|approved|aprobados)\b/)) {
+      console.log('✅ Intent detected: insurance_approved');
+      return { type: 'insurance_approved' };
+    }
+    if (lowerMessage.match(/\b(rechazado|rejected|rechazados)\b/)) {
+      console.log('✅ Intent detected: insurance_rejected');
+      return { type: 'insurance_rejected' };
+    }
+    console.log('✅ Intent detected: insurance_info');
+    return { type: 'insurance_info' };
   }
 
   // Greeting and help - enhanced
@@ -725,6 +903,86 @@ const generateResponse = async (intent, data, originalMessage) => {
 • Este mes: **${data.thisMonth}**
 • Esta semana: **${data.thisWeek}**`;
 
+    case 'procedure_count':
+    case 'procedure_info':
+      return `🏥 **Procedimientos:**
+• Total: **${data.total}**
+• Programados: **${data.scheduled}**
+• En progreso: **${data.inProgress}**
+• Completados: **${data.completed}**
+• Cancelados: **${data.cancelled}**
+• Hoy: **${data.today}**`;
+
+    case 'procedure_scheduled':
+      return `Hay **${data.scheduled}** procedimientos programados.`;
+
+    case 'procedure_completed':
+      return `Hay **${data.completed}** procedimientos completados.`;
+
+    case 'procedure_today':
+      return `Hoy hay **${data.today}** ${data.today === 1 ? 'procedimiento programado' : 'procedimientos programados'}.`;
+
+    case 'therapy_count':
+    case 'therapy_info':
+      return `💊 **Horarios de Terapia:**
+• Total: **${data.total}**
+• Activos: **${data.active}**
+• Completados: **${data.completed}**
+• Cancelados: **${data.cancelled}**`;
+
+    case 'therapy_active':
+      return `Hay **${data.active}** horarios de terapia activos.`;
+
+    case 'study_result_count':
+    case 'study_result_info':
+      return `🔬 **Resultados de Estudios:**
+• Total: **${data.total}**
+• Pendientes: **${data.pending}**
+• Completados: **${data.completed}**
+• Revisados: **${data.reviewed}**
+• Este mes: **${data.thisMonth}**`;
+
+    case 'study_result_pending':
+      return `Hay **${data.pending}** resultados de estudios pendientes de revisión.`;
+
+    case 'study_result_month':
+      return `Este mes se han realizado **${data.thisMonth}** estudios.`;
+
+    case 'certificate_count':
+    case 'certificate_info':
+      return `📜 **Certificaciones Médicas:**
+• Total: **${data.total}**
+• Activas: **${data.active}**
+• Vencidas: **${data.expired}**
+• Este mes: **${data.thisMonth}**`;
+
+    case 'certificate_active':
+      return `Hay **${data.active}** certificaciones médicas activas.`;
+
+    case 'certificate_expired':
+      return `Hay **${data.expired}** certificaciones médicas vencidas.`;
+
+    case 'certificate_month':
+      return `Este mes se han emitido **${data.thisMonth}** certificaciones médicas.`;
+
+    case 'insurance_count':
+    case 'insurance_info':
+      return `🛡️ **Autorizaciones de Seguro:**
+• Total: **${data.total}**
+• Pendientes: **${data.pending}**
+• Aprobadas: **${data.approved}**
+• Rechazadas: **${data.rejected}**
+• Vencidas: **${data.expired}**`;
+
+    case 'insurance_pending':
+      return `Hay **${data.pending}** autorizaciones de seguro pendientes.`;
+
+    case 'insurance_approved':
+      return `Hay **${data.approved}** autorizaciones de seguro aprobadas.`;
+
+    case 'insurance_rejected':
+      return `Hay **${data.rejected}** autorizaciones de seguro rechazadas.`;
+
     case 'general_count':
       // Try to provide a general overview when we detect a "how many" question
       return `📊 **Resumen General del Sistema:**
@@ -733,11 +991,16 @@ const generateResponse = async (intent, data, originalMessage) => {
 • Personal: Consulta con "¿Cuántos doctores hay?"
 • Inventario: Consulta con "Artículos con stock bajo"
 • Financiero: Consulta con "Ingresos de hoy"
+• Procedimientos: Consulta con "¿Cuántos procedimientos hay?"
+• Terapias: Consulta con "Horarios de terapia activos"
+• Estudios: Consulta con "Resultados de estudios pendientes"
+• Certificados: Consulta con "Certificados médicos activos"
+• Seguros: Consulta con "Autorizaciones de seguro pendientes"
 
 ¿Sobre qué sección te gustaría saber más?`;
 
     default:
-      return 'Puedo ayudarte con información sobre pacientes, citas, inventario, facturación, personal y expedientes médicos. ¿Qué te gustaría saber? Intenta preguntar de forma más específica, por ejemplo: "¿Cuántos pacientes hay?" o "Buscar paciente Juan".';
+      return 'Puedo ayudarte con información sobre pacientes, citas, inventario, facturación, personal, expedientes médicos, procedimientos, horarios de terapia, resultados de estudios, certificaciones médicas y autorizaciones de seguro. ¿Qué te gustaría saber? Intenta preguntar de forma más específica, por ejemplo: "¿Cuántos pacientes hay?" o "¿Cuántos procedimientos hay?".';
   }
 };
 
@@ -843,6 +1106,48 @@ exports.chat = async (req, res) => {
         case 'medical_records_month':
         case 'medical_records_info':
           data = await getSystemData.getMedicalRecordsStats();
+          response = await generateResponse(intent, data, message);
+          break;
+
+        case 'procedure_count':
+        case 'procedure_info':
+        case 'procedure_scheduled':
+        case 'procedure_completed':
+        case 'procedure_today':
+          data = await getSystemData.getProcedureStats();
+          response = await generateResponse(intent, data, message);
+          break;
+
+        case 'therapy_count':
+        case 'therapy_info':
+        case 'therapy_active':
+          data = await getSystemData.getTherapyStats();
+          response = await generateResponse(intent, data, message);
+          break;
+
+        case 'study_result_count':
+        case 'study_result_info':
+        case 'study_result_pending':
+        case 'study_result_month':
+          data = await getSystemData.getStudyResultStats();
+          response = await generateResponse(intent, data, message);
+          break;
+
+        case 'certificate_count':
+        case 'certificate_info':
+        case 'certificate_active':
+        case 'certificate_expired':
+        case 'certificate_month':
+          data = await getSystemData.getCertificateStats();
+          response = await generateResponse(intent, data, message);
+          break;
+
+        case 'insurance_count':
+        case 'insurance_info':
+        case 'insurance_pending':
+        case 'insurance_approved':
+        case 'insurance_rejected':
+          data = await getSystemData.getInsuranceStats();
           response = await generateResponse(intent, data, message);
           break;
 
