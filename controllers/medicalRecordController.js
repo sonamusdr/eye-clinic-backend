@@ -81,9 +81,24 @@ exports.getMedicalRecordById = async (req, res) => {
       return res.status(404).json({ message: 'Medical record not found' });
     }
 
+    // Si el registro no tiene datos del paciente completos, intentar obtenerlos del paciente
+    const recordData = medicalRecord.toJSON();
+    if (recordData.Patient && !recordData.firstName) {
+      recordData.firstName = recordData.Patient.firstName || '';
+      recordData.lastName = recordData.Patient.lastName || '';
+      recordData.address = recordData.Patient.address || '';
+      recordData.city = recordData.Patient.city || '';
+      recordData.email = recordData.Patient.email || '';
+      recordData.cellPhone = recordData.Patient.phone || '';
+      recordData.dateOfBirth = recordData.Patient.dateOfBirth || '';
+      recordData.gender = recordData.Patient.gender || '';
+      recordData.insuranceProviderName = recordData.Patient.insuranceProvider || '';
+      recordData.insurancePolicyNumber = recordData.Patient.insurancePolicyNumber || '';
+    }
+
     res.json({
       success: true,
-      medicalRecord
+      medicalRecord: recordData
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

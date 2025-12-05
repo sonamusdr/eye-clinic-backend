@@ -110,6 +110,7 @@ exports.getAppointments = async (req, res) => {
         { model: Patient, attributes: ['id', 'firstName', 'lastName', 'phone', 'email'] },
         { model: User, as: 'doctor', attributes: ['id', 'firstName', 'lastName', 'specialization'] }
       ],
+      order: [['appointmentDate', 'DESC'], ['startTime', 'ASC']],
       limit: parseInt(limit),
       offset: parseInt(offset),
       order: [['appointmentDate', 'ASC'], ['startTime', 'ASC']]

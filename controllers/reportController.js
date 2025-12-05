@@ -1,4 +1,4 @@
-const { Patient, MedicalRecord, Appointment, Invoice, Payment, User, Inventory } = require('../models');
+const { Patient, MedicalRecord, Appointment, Invoice, Payment, User, Inventory, Procedure, TherapySchedule, StudyResult, MedicalCertificate, InsuranceAuthorization } = require('../models');
 const { Op } = require('sequelize');
 const moment = require('moment');
 
@@ -99,16 +99,10 @@ exports.getFinancialReport = async (req, res) => {
       })
     ]);
 
-    const totalRevenue = payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
-    const totalInvoiced = invoices.reduce((sum, inv) => sum + parseFloat(inv.total), 0);
-    const pendingAmount = invoices
-      .filter(inv => inv.status !== 'paid')
-      .reduce((sum, inv) => sum + parseFloat(inv.total), 0);
-
-    const revenueByMethod = payments.reduce((acc, payment) => {
-      acc[payment.paymentMethod] = (acc[payment.paymentMethod] || 0) + parseFloat(payment.amount);
-      return acc;
-    }, {});
+    const totalRevenue = payments.reduce((sum, pay) => sum + parseFloat(pay.amount || 0), 0);
+    const totalInvoiced = invoices.reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0);
+    const pendingInvoices = invoices.filter(inv => inv.status === 'pending');
+    const pendingAmount = pendingInvoices.reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0);
 
     res.json({
       success: true,
@@ -117,10 +111,9 @@ exports.getFinancialReport = async (req, res) => {
         summary: {
           totalRevenue,
           totalInvoiced,
-          pendingAmount,
-          paidAmount: totalRevenue
+          pendingInvoices: pendingInvoices.length,
+          pendingAmount
         },
-        revenueByMethod,
         invoices,
         payments
       }
@@ -141,47 +134,20 @@ exports.getOperationalReport = async (req, res) => {
       };
     }
 
-    const [appointments, patients, staff] = await Promise.all([
-      Appointment.findAll({
-        where,
-        include: [
-          { model: Patient },
-          { model: User, as: 'doctor' }
-        ]
-      }),
-      Patient.count({
-        where: {
-          ...(startDate && endDate ? {
-            createdAt: {
-              [Op.between]: [startDate, endDate]
-            }
-          } : {})
-        }
-      }),
-      User.count({ where: { isActive: true } })
-    ]);
-
-    const appointmentsByStatus = appointments.reduce((acc, apt) => {
-      acc[apt.status] = (acc[apt.status] || 0) + 1;
-      return acc;
-    }, {});
-
-    const appointmentsByType = appointments.reduce((acc, apt) => {
-      acc[apt.appointmentType] = (acc[apt.appointmentType] || 0) + 1;
-      return acc;
-    }, {});
+    const appointments = await Appointment.findAll({
+      where,
+      include: [
+        { model: Patient, attributes: ['firstName', 'lastName'] },
+        { model: User, as: 'doctor', attributes: ['firstName', 'lastName'] }
+      ],
+      order: [['appointmentDate', 'DESC']]
+    });
 
     res.json({
       success: true,
       report: {
         period: { startDate, endDate },
-        summary: {
-          totalAppointments: appointments.length,
-          newPatients: patients,
-          activeStaff: staff
-        },
-        appointmentsByStatus,
-        appointmentsByType,
+        total: appointments.length,
         appointments
       }
     });
@@ -298,7 +264,7 @@ exports.getInventoryReport = async (req, res) => {
       items = await Inventory.findAll({
         order: [['itemName', 'ASC']]
       });
-      items = items.filter(item => parseFloat(item.quantity || 0) <= parseFloat(item.reorderLevel || 0));
+      items = items.filter(item => item.quantity <= item.reorderLevel);
     } else {
       items = await Inventory.findAll({
         order: [['itemName', 'ASC']]
@@ -322,7 +288,7 @@ exports.getInventoryReport = async (req, res) => {
   }
 };
 
-// Get appointments report
+// Get all appointments report
 exports.getAppointmentsReport = async (req, res) => {
   try {
     const { startDate, endDate, status, doctorId } = req.query;
@@ -343,10 +309,10 @@ exports.getAppointmentsReport = async (req, res) => {
     const appointments = await Appointment.findAll({
       where,
       include: [
-        { model: Patient, attributes: ['firstName', 'lastName', 'phone', 'email'] },
-        { model: User, as: 'doctor', attributes: ['firstName', 'lastName', 'specialization'] }
+        { model: Patient, attributes: ['firstName', 'lastName'] },
+        { model: User, as: 'doctor', attributes: ['firstName', 'lastName'] }
       ],
-      order: [['appointmentDate', 'DESC'], ['startTime', 'ASC']]
+      order: [['appointmentDate', 'DESC']]
     });
 
     res.json({
@@ -362,3 +328,221 @@ exports.getAppointmentsReport = async (req, res) => {
   }
 };
 
+// Get procedures report
+exports.getProceduresReport = async (req, res) => {
+  try {
+    const { startDate, endDate, status } = req.query;
+
+    const where = {};
+    if (startDate && endDate) {
+      where.procedureDate = {
+        [Op.between]: [startDate, endDate]
+      };
+    }
+    if (status) {
+      where.status = status;
+    }
+
+    const procedures = await Procedure.findAll({
+      where,
+      include: [
+        { model: Patient, attributes: ['firstName', 'lastName'] },
+        { model: User, as: 'doctor', attributes: ['firstName', 'lastName'] }
+      ],
+      order: [['procedureDate', 'DESC']]
+    });
+
+    res.json({
+      success: true,
+      report: {
+        period: { startDate, endDate },
+        total: procedures.length,
+        procedures
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get therapy schedules report
+exports.getTherapySchedulesReport = async (req, res) => {
+  try {
+    const { startDate, endDate, status } = req.query;
+
+    const where = {};
+    if (startDate && endDate) {
+      where.startDate = {
+        [Op.between]: [startDate, endDate]
+      };
+    }
+    if (status) {
+      where.status = status;
+    }
+
+    const therapySchedules = await TherapySchedule.findAll({
+      where,
+      include: [
+        { model: Patient, attributes: ['firstName', 'lastName'] },
+        { model: User, as: 'doctor', attributes: ['firstName', 'lastName'] }
+      ],
+      order: [['startDate', 'DESC']]
+    });
+
+    res.json({
+      success: true,
+      report: {
+        period: { startDate, endDate },
+        total: therapySchedules.length,
+        therapySchedules
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get study results report
+exports.getStudyResultsReport = async (req, res) => {
+  try {
+    const { startDate, endDate, status } = req.query;
+
+    const where = {};
+    if (startDate && endDate) {
+      where.resultDate = {
+        [Op.between]: [startDate, endDate]
+      };
+    }
+    if (status) {
+      where.status = status;
+    }
+
+    const studyResults = await StudyResult.findAll({
+      where,
+      include: [
+        { model: Patient, attributes: ['firstName', 'lastName'] },
+        { model: User, as: 'doctor', attributes: ['firstName', 'lastName'] }
+      ],
+      order: [['resultDate', 'DESC']]
+    });
+
+    res.json({
+      success: true,
+      report: {
+        period: { startDate, endDate },
+        total: studyResults.length,
+        studyResults
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get medical certificates report
+exports.getMedicalCertificatesReport = async (req, res) => {
+  try {
+    const { startDate, endDate, status } = req.query;
+
+    const where = {};
+    if (startDate && endDate) {
+      where.issueDate = {
+        [Op.between]: [startDate, endDate]
+      };
+    }
+    if (status) {
+      where.status = status;
+    }
+
+    const certificates = await MedicalCertificate.findAll({
+      where,
+      include: [
+        { model: Patient, attributes: ['firstName', 'lastName'] },
+        { model: User, as: 'doctor', attributes: ['firstName', 'lastName'] }
+      ],
+      order: [['issueDate', 'DESC']]
+    });
+
+    res.json({
+      success: true,
+      report: {
+        period: { startDate, endDate },
+        total: certificates.length,
+        certificates
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get insurance authorizations report
+exports.getInsuranceAuthorizationsReport = async (req, res) => {
+  try {
+    const { startDate, endDate, status } = req.query;
+
+    const where = {};
+    if (startDate && endDate) {
+      where.requestDate = {
+        [Op.between]: [startDate, endDate]
+      };
+    }
+    if (status) {
+      where.status = status;
+    }
+
+    const authorizations = await InsuranceAuthorization.findAll({
+      where,
+      include: [
+        { model: Patient, attributes: ['firstName', 'lastName'] },
+        { model: User, as: 'doctor', attributes: ['firstName', 'lastName'] }
+      ],
+      order: [['requestDate', 'DESC']]
+    });
+
+    res.json({
+      success: true,
+      report: {
+        period: { startDate, endDate },
+        total: authorizations.length,
+        authorizations
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get medical records report
+exports.getMedicalRecordsReport = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    const where = {};
+    if (startDate && endDate) {
+      where.visitDate = {
+        [Op.between]: [startDate, endDate]
+      };
+    }
+
+    const medicalRecords = await MedicalRecord.findAll({
+      where,
+      include: [
+        { model: Patient, attributes: ['firstName', 'lastName'] },
+        { model: User, as: 'doctor', attributes: ['firstName', 'lastName'] }
+      ],
+      order: [['visitDate', 'DESC']]
+    });
+
+    res.json({
+      success: true,
+      report: {
+        period: { startDate, endDate },
+        total: medicalRecords.length,
+        medicalRecords
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

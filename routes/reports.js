@@ -8,7 +8,13 @@ const {
   getPatientsReport,
   getStaffReport,
   getInventoryReport,
-  getAppointmentsReport
+  getAppointmentsReport,
+  getProceduresReport,
+  getTherapySchedulesReport,
+  getStudyResultsReport,
+  getMedicalCertificatesReport,
+  getInsuranceAuthorizationsReport,
+  getMedicalRecordsReport
 } = require('../controllers/reportController');
 const { authenticate, authorize } = require('../middleware/auth');
 
@@ -20,6 +26,12 @@ router.get('/appointments/stats', authenticate, getAppointmentStats);
 router.get('/appointments', authenticate, getAppointmentsReport);
 router.get('/staff', authenticate, getStaffReport);
 router.get('/inventory', authenticate, getInventoryReport);
+router.get('/procedures', authenticate, getProceduresReport);
+router.get('/therapy-schedules', authenticate, getTherapySchedulesReport);
+router.get('/study-results', authenticate, getStudyResultsReport);
+router.get('/medical-certificates', authenticate, getMedicalCertificatesReport);
+router.get('/insurance-authorizations', authenticate, getInsuranceAuthorizationsReport);
+router.get('/medical-records', authenticate, getMedicalRecordsReport);
 
 module.exports = router;
 
