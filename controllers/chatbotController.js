@@ -501,6 +501,9 @@ IMPORTANTE: Mantén conversaciones fluidas y naturales. Recuerda el contexto. Ha
     ];
 
     console.log(`💬 Sending ${messages.length} messages to OpenAI (${formattedHistory.length} from history)`);
+    console.log(`   Model: ${process.env.OPENAI_MODEL || 'gpt-3.5-turbo'}`);
+    console.log(`   API Key present: ${!!process.env.OPENAI_API_KEY}`);
+    console.log(`   API Key length: ${process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0}`);
 
     const completion = await openaiClient.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
@@ -513,7 +516,17 @@ IMPORTANTE: Mantén conversaciones fluidas y naturales. Recuerda el contexto. Ha
       stream: false
     });
 
+    if (!completion || !completion.choices || !completion.choices[0]) {
+      console.error('❌ Invalid response from OpenAI API');
+      return null;
+    }
+
     const aiResponse = completion.choices[0].message.content;
+    
+    if (!aiResponse || aiResponse.trim().length === 0) {
+      console.error('❌ Empty response from OpenAI API');
+      return null;
+    }
     
     // Log for debugging
     console.log('✅ AI Response generated successfully');
@@ -1086,6 +1099,16 @@ exports.chat = async (req, res) => {
 
     // Always try AI first if available (prioritize conversational AI)
     let aiResponse = null;
+    
+    // Double-check openaiClient status
+    console.log('🔍 Checking OpenAI client status...');
+    console.log(`   openaiClient exists: ${!!openaiClient}`);
+    console.log(`   OPENAI_API_KEY in env: ${!!process.env.OPENAI_API_KEY}`);
+    if (process.env.OPENAI_API_KEY) {
+      console.log(`   OPENAI_API_KEY length: ${process.env.OPENAI_API_KEY.length}`);
+      console.log(`   OPENAI_API_KEY prefix: ${process.env.OPENAI_API_KEY.substring(0, 7)}...`);
+    }
+    
     if (openaiClient) {
       console.log('🤖 OpenAI client available, attempting AI response...');
       console.log(`   Message: "${message.substring(0, 50)}..."`);
@@ -1096,15 +1119,39 @@ exports.chat = async (req, res) => {
           console.log('✅ AI response generated successfully');
           console.log(`   Response preview: "${aiResponse.substring(0, 100)}..."`);
         } else {
-          console.log('⚠️  AI returned empty response, falling back to rule-based');
+          console.log('⚠️  AI returned empty or null response, falling back to rule-based');
         }
       } catch (error) {
         console.error('❌ AI error, falling back to rule-based:', error);
         console.error('   Error details:', error.message);
+        console.error('   Error stack:', error.stack);
       }
     } else {
-      console.log('ℹ️  OpenAI client not available, using rule-based system');
+      console.log('⚠️  OpenAI client NOT available, using rule-based system');
       console.log('   OPENAI_API_KEY present:', !!process.env.OPENAI_API_KEY);
+      if (process.env.OPENAI_API_KEY) {
+        console.log('   ⚠️  WARNING: API key exists but client is null - reinitializing...');
+        // Try to reinitialize
+        try {
+          const apiKey = process.env.OPENAI_API_KEY.trim();
+          if (apiKey && apiKey.length > 10) {
+            const OpenAI = require('openai');
+            openaiClient = new OpenAI({ apiKey: apiKey });
+            console.log('   ✅ OpenAI client reinitialized successfully');
+            // Try again with reinitialized client
+            try {
+              aiResponse = await useAIForChat(message, conversationHistory);
+              if (aiResponse && aiResponse.trim().length > 0) {
+                console.log('✅ AI response generated after reinitialization');
+              }
+            } catch (retryError) {
+              console.error('❌ AI failed after reinitialization:', retryError.message);
+            }
+          }
+        } catch (initError) {
+          console.error('❌ Failed to reinitialize OpenAI:', initError.message);
+        }
+      }
     }
 
     // If AI provided a response, use it (even if short, AI is more conversational)

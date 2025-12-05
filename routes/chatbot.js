@@ -11,15 +11,21 @@ router.get('/status', authenticate, (req, res) => {
   const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
   const openaiModel = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
   
+  // Import the openaiClient from the controller to check its actual status
+  const chatbotController = require('../controllers/chatbotController');
+  
   // Try to check if OpenAI client is initialized
   let openaiStatus = 'not_configured';
+  let clientInitialized = false;
+  
   try {
     if (hasOpenAIKey) {
       const OpenAI = require('openai');
-      const client = new OpenAI({
+      const testClient = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY
       });
       openaiStatus = 'configured';
+      clientInitialized = true;
     }
   } catch (error) {
     openaiStatus = 'error';
@@ -33,7 +39,9 @@ router.get('/status', authenticate, (req, res) => {
       status: openaiStatus,
       model: openaiModel,
       apiKeyPresent: hasOpenAIKey,
-      apiKeyLength: hasOpenAIKey ? process.env.OPENAI_API_KEY.length : 0
+      apiKeyLength: hasOpenAIKey ? process.env.OPENAI_API_KEY.length : 0,
+      apiKeyPrefix: hasOpenAIKey ? process.env.OPENAI_API_KEY.substring(0, 7) + '...' : null,
+      clientInitialized: clientInitialized
     },
     message: hasOpenAIKey && openaiStatus === 'configured' 
       ? 'AI is properly configured and ready to use'
