@@ -1311,11 +1311,17 @@ exports.chat = async (req, res) => {
       response = 'Lo siento, hubo un error al obtener la información. Por favor intenta de nuevo o reformula tu pregunta.';
     }
 
+    console.log('📤 Returning rule-based response');
+    console.log(`   Intent: ${intent.type}`);
+    console.log(`   Response length: ${response.length} chars`);
+    
     res.json({
       success: true,
       response,
       intent: intent.type,
-      aiEnabled: !!openaiClient
+      aiEnabled: !!openaiClient,
+      aiUsed: false,
+      fallbackReason: openaiClient ? 'ai_failed' : 'ai_not_available'
     });
   } catch (error) {
     console.error('Chatbot error:', error);
